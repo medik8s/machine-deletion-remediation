@@ -1,0 +1,7 @@
+apiVersion: app.example.com/v1alpha1
+kind: MachineDeletionRemediation
+metadata:
+  name: machinedeletionremediation-sample
+spec:
+  # Add fields here
+  foo: bar

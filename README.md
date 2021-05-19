@@ -1,1 +1,1 @@
-# default-remediation-operator
+# machine-deletion-remediation

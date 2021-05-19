@@ -1,0 +1,24 @@
+# permissions for end users to edit machinedeletionremediationtemplates.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: machinedeletionremediationtemplate-editor-role
+rules:
+- apiGroups:
+  - app.example.com
+  resources:
+  - machinedeletionremediationtemplates
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - app.example.com
+  resources:
+  - machinedeletionremediationtemplates/status
+  verbs:
+  - get

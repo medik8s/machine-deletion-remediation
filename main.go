@@ -31,8 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	appv1alpha1 "github.com/mshitrit/default-remediation-operator/api/v1alpha1"
-	"github.com/mshitrit/default-remediation-operator/controllers"
+	appv1alpha1 "github.com/medik8s/machine-deletion-remediation/api/v1alpha1"
+	"github.com/medik8s/machine-deletion-remediation/controllers"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -71,27 +71,27 @@ func main() {
 		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "5332a5b3.example.com",
+		LeaderElectionID:       "285d4098.example.com",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
 
-	if err = (&controllers.DefaultRemediationTemplateReconciler{
+	if err = (&controllers.MachineDeletionRemediationReconciler{
 		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("DefaultRemediationTemplate"),
+		Log:    ctrl.Log.WithName("controllers").WithName("MachineDeletionRemediation"),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "DefaultRemediationTemplate")
+		setupLog.Error(err, "unable to create controller", "controller", "MachineDeletionRemediation")
 		os.Exit(1)
 	}
-	if err = (&controllers.DefaultRemediationReconciler{
+	if err = (&controllers.MachineDeletionRemediationTemplateReconciler{
 		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("DefaultRemediation"),
+		Log:    ctrl.Log.WithName("controllers").WithName("MachineDeletionRemediationTemplate"),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "DefaultRemediation")
+		setupLog.Error(err, "unable to create controller", "controller", "MachineDeletionRemediationTemplate")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

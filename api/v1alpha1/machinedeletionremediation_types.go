@@ -28,8 +28,6 @@ type MachineDeletionRemediationSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of MachineDeletionRemediation. Edit machinedeletionremediation_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
 }
 
 // MachineDeletionRemediationStatus defines the observed state of MachineDeletionRemediation

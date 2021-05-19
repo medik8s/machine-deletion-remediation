@@ -17,6 +17,7 @@ limitations under the License.
 package controllers
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -50,6 +51,10 @@ func TestAPIs(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
+	Expect(os.Setenv("TEST_ASSET_KUBE_APISERVER", "../testbin/bin/kube-apiserver")).To(Succeed())
+	Expect(os.Setenv("TEST_ASSET_ETCD", "../testbin/bin/etcd")).To(Succeed())
+	Expect(os.Setenv("TEST_ASSET_KUBECTL", "../testbin/bin/kubectl")).To(Succeed())
+
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
 	By("bootstrapping test environment")
@@ -80,4 +85,8 @@ var _ = AfterSuite(func() {
 	By("tearing down the test environment")
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
+
+	Expect(os.Unsetenv("TEST_ASSET_KUBE_APISERVER")).To(Succeed())
+	Expect(os.Unsetenv("TEST_ASSET_ETCD")).To(Succeed())
+	Expect(os.Unsetenv("TEST_ASSET_KUBECTL")).To(Succeed())
 })

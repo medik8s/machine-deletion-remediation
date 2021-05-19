@@ -6,20 +6,20 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.4.1
   creationTimestamp: null
-  name: machinedeletionremediationtemplates.remediation.medik8s.io
+  name: machinedeletionremediations.machine.remediation.medik8s.io
 spec:
-  group: remediation.medik8s.io
+  group: machine.remediation.medik8s.io
   names:
-    kind: MachineDeletionRemediationTemplate
-    listKind: MachineDeletionRemediationTemplateList
-    plural: machinedeletionremediationtemplates
-    singular: machinedeletionremediationtemplate
+    kind: MachineDeletionRemediation
+    listKind: MachineDeletionRemediationList
+    plural: machinedeletionremediations
+    singular: machinedeletionremediation
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: MachineDeletionRemediationTemplate is the Schema for the machinedeletionremediationtemplates
+        description: MachineDeletionRemediation is the Schema for the machinedeletionremediations
           API
         properties:
           apiVersion:
@@ -35,17 +35,12 @@ spec:
           metadata:
             type: object
           spec:
-            description: MachineDeletionRemediationTemplateSpec defines the desired
-              state of MachineDeletionRemediationTemplate
-            properties:
-              foo:
-                description: Foo is an example field of MachineDeletionRemediationTemplate.
-                  Edit machinedeletionremediationtemplate_types.go to remove/update
-                type: string
+            description: MachineDeletionRemediationSpec defines the desired state
+              of MachineDeletionRemediation
             type: object
           status:
-            description: MachineDeletionRemediationTemplateStatus defines the observed
-              state of MachineDeletionRemediationTemplate
+            description: MachineDeletionRemediationStatus defines the observed state
+              of MachineDeletionRemediation
             type: object
         type: object
     served: true

@@ -18,6 +18,9 @@ package controllers
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -25,6 +28,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appv1alpha1 "github.com/medik8s/machine-deletion-remediation/api/v1alpha1"
+)
+
+const (
+	machineKind = "Machine"
 )
 
 // MachineDeletionRemediationReconciler reconciles a MachineDeletionRemediation object
@@ -52,6 +59,22 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 
 	// your logic here
 
+	// your logic here
+	//fetch the remediation
+	var remediation *appv1alpha1.MachineDeletionRemediation
+	if remediation = r.getRemediation(ctx, req); remediation == nil {
+		return ctrl.Result{}, nil
+	}
+	//not a machine based remediation
+	machineOwnerRef := getMachineOwnerRef(remediation)
+	if machineOwnerRef == nil {
+		return ctrl.Result{}, nil
+	}
+	//delete the machine
+	if err := r.deleteMachine(ctx, buildMachine(machineOwnerRef, remediation)); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	return ctrl.Result{}, nil
 }
 
@@ -60,4 +83,44 @@ func (r *MachineDeletionRemediationReconciler) SetupWithManager(mgr ctrl.Manager
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appv1alpha1.MachineDeletionRemediation{}).
 		Complete(r)
+}
+
+func (r *MachineDeletionRemediationReconciler) getRemediation(ctx context.Context, req ctrl.Request) *appv1alpha1.MachineDeletionRemediation {
+	remediation := new(appv1alpha1.MachineDeletionRemediation)
+	key := client.ObjectKey{Name: req.Name, Namespace: req.Namespace}
+	if err := r.Client.Get(ctx, key, remediation); err != nil {
+		if !errors.IsNotFound(err) {
+			r.Log.Error(err, "error retrieving remediation %s in namespace %s: %v", req.Name, req.Namespace)
+		}
+		return nil
+	}
+	return remediation
+}
+
+func (r *MachineDeletionRemediationReconciler) deleteMachine(ctx context.Context, machine *unstructured.Unstructured) error {
+	if err := r.Client.Delete(ctx, machine); err != nil {
+		if !errors.IsNotFound(err) {
+			r.Log.Error(err, "error deleting machine %s in namespace %s: %v", machine.GetName(), machine.GetNamespace())
+			return err
+		}
+		r.Log.Info("machine: %s in namespace: %s is deleted , but remediation still exist", machine.GetName(), machine.GetNamespace(), err)
+	}
+	return nil
+}
+
+func getMachineOwnerRef(remediation *appv1alpha1.MachineDeletionRemediation) *v1.OwnerReference {
+	for _, ownerRef := range remediation.OwnerReferences {
+		if ownerRef.Kind == machineKind {
+			return &ownerRef
+		}
+	}
+	return nil
+}
+func buildMachine(ref *v1.OwnerReference, remediation *appv1alpha1.MachineDeletionRemediation) *unstructured.Unstructured {
+	machine := new(unstructured.Unstructured)
+	machine.SetName(remediation.Name)
+	machine.SetNamespace(remediation.Namespace)
+	machine.SetKind(machineKind)
+	machine.SetAPIVersion(ref.APIVersion)
+	return machine
 }

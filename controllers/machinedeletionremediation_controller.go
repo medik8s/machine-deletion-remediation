@@ -18,16 +18,15 @@ package controllers
 
 import (
 	"context"
+	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-
-	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appv1alpha1 "github.com/medik8s/machine-deletion-remediation/api/v1alpha1"
+	"github.com/medik8s/machine-deletion-remediation/api/v1alpha1"
 )
 
 const (
@@ -55,13 +54,12 @@ type MachineDeletionRemediationReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.8.3/pkg/reconcile
 func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = r.Log.WithValues("machinedeletionremediation", req.NamespacedName)
+	log := r.Log.WithValues("machinedeletionremediation", req.NamespacedName)
 
-	// your logic here
+	log.Info("reconciling...")
 
-	// your logic here
 	//fetch the remediation
-	var remediation *appv1alpha1.MachineDeletionRemediation
+	var remediation *v1alpha1.MachineDeletionRemediation
 	if remediation = r.getRemediation(ctx, req); remediation == nil {
 		return ctrl.Result{}, nil
 	}
@@ -81,12 +79,12 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 // SetupWithManager sets up the controller with the Manager.
 func (r *MachineDeletionRemediationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&appv1alpha1.MachineDeletionRemediation{}).
+		For(&v1alpha1.MachineDeletionRemediation{}).
 		Complete(r)
 }
 
-func (r *MachineDeletionRemediationReconciler) getRemediation(ctx context.Context, req ctrl.Request) *appv1alpha1.MachineDeletionRemediation {
-	remediation := new(appv1alpha1.MachineDeletionRemediation)
+func (r *MachineDeletionRemediationReconciler) getRemediation(ctx context.Context, req ctrl.Request) *v1alpha1.MachineDeletionRemediation {
+	remediation := new(v1alpha1.MachineDeletionRemediation)
 	key := client.ObjectKey{Name: req.Name, Namespace: req.Namespace}
 	if err := r.Client.Get(ctx, key, remediation); err != nil {
 		if !errors.IsNotFound(err) {
@@ -108,7 +106,7 @@ func (r *MachineDeletionRemediationReconciler) deleteMachine(ctx context.Context
 	return nil
 }
 
-func getMachineOwnerRef(remediation *appv1alpha1.MachineDeletionRemediation) *v1.OwnerReference {
+func getMachineOwnerRef(remediation *v1alpha1.MachineDeletionRemediation) *v1.OwnerReference {
 	for _, ownerRef := range remediation.OwnerReferences {
 		if ownerRef.Kind == machineKind {
 			return &ownerRef
@@ -116,7 +114,7 @@ func getMachineOwnerRef(remediation *appv1alpha1.MachineDeletionRemediation) *v1
 	}
 	return nil
 }
-func buildMachine(ref *v1.OwnerReference, remediation *appv1alpha1.MachineDeletionRemediation) *unstructured.Unstructured {
+func buildMachine(ref *v1.OwnerReference, remediation *v1alpha1.MachineDeletionRemediation) *unstructured.Unstructured {
 	machine := new(unstructured.Unstructured)
 	machine.SetName(remediation.Name)
 	machine.SetNamespace(remediation.Namespace)

@@ -8,12 +8,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
-	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"time"
 )
 
 const (
@@ -49,26 +45,16 @@ var _ = Describe("Default Remediation CR", func() {
 
 	Context("Reconciliation", func() {
 		var (
-			underTest           *v1alpha1.MachineDeletionRemediation
-			objects             []runtime.Object
-			reconciler          MachineDeletionRemediationReconciler
-			reconcileError      error
-			getRemediationError error
+			underTest *v1alpha1.MachineDeletionRemediation
 		)
 
-		JustBeforeEach(func() {
-			cl := fake.NewClientBuilder().WithRuntimeObjects(objects...).Build()
-			reconciler = MachineDeletionRemediationReconciler{Client: cl, Log: controllerruntime.Log, Scheme: scheme.Scheme}
-			_, reconcileError = reconciler.Reconcile(
-				context.Background(),
-				controllerruntime.Request{NamespacedName: types.NamespacedName{Name: underTest.Name, Namespace: underTest.Namespace}})
-			getRemediationError = reconciler.Get(
-				context.Background(),
-				client.ObjectKey{Namespace: underTest.Namespace, Name: underTest.Name},
-				underTest)
-		})
-
 		When("remediation cr exist", func() {
+
+			var (
+				remediationOwnerMachine *unstructured.Unstructured
+				nonRelatedMachine       *unstructured.Unstructured
+				machineDeleted          bool
+			)
 
 			BeforeEach(func() {
 				underTest = &v1alpha1.MachineDeletionRemediation{
@@ -79,34 +65,47 @@ var _ = Describe("Default Remediation CR", func() {
 							{
 								Kind:       machineKind,
 								APIVersion: "mock.api.version/alpha",
+								Name:       remediationName,
+								UID:        "1",
 							},
 						},
 					},
 				}
-				remediationOwnerMachine := createMachine(underTest)
+				remediationOwnerMachine = createMachine(underTest)
 
-				nonRelatedMachine := createMachine(underTest)
+				nonRelatedMachine = createMachine(underTest)
 				nonRelatedMachine.SetName(dummyMachine)
 
-				objects = []runtime.Object{underTest, remediationOwnerMachine, nonRelatedMachine}
+				Expect(k8sClient.Create(context.Background(), remediationOwnerMachine)).ToNot(HaveOccurred())
+				Expect(k8sClient.Create(context.Background(), nonRelatedMachine)).ToNot(HaveOccurred())
+				Expect(k8sClient.Create(context.Background(), underTest)).ToNot(HaveOccurred())
+			})
+
+			AfterEach(func() {
+				if !machineDeleted {
+					Expect(k8sClient.Delete(context.Background(), remediationOwnerMachine)).ToNot(HaveOccurred())
+				}
+				Expect(k8sClient.Delete(context.Background(), nonRelatedMachine)).ToNot(HaveOccurred())
+				Expect(k8sClient.Delete(context.Background(), underTest)).ToNot(HaveOccurred())
 			})
 
 			It("Machine referenced from remediation should be deleted", func() {
-				Expect(reconcileError).NotTo(HaveOccurred())
-				Expect(getRemediationError).NotTo(HaveOccurred())
-				tmp := createMachine(underTest)
-				err := reconciler.Client.Get(context.Background(), client.ObjectKey{Namespace: defaultNamespace, Name: remediationName}, tmp)
-				Expect(errors.IsNotFound(err)).To(BeTrue())
-
+				tmp := &unstructured.Unstructured{}
+				tmp.SetKind(machineKind)
+				tmp.SetAPIVersion("mock.api.version/alpha")
+				Eventually(func() bool {
+					return errors.IsNotFound(k8sClient.Get(context.Background(), client.ObjectKey{Namespace: defaultNamespace, Name: remediationName}, tmp))
+				}, 5*time.Second, 250*time.Millisecond).Should(BeTrue())
+				machineDeleted = true
 			})
 
 			It("Machine not referenced from remediation should not be deleted", func() {
-				Expect(reconcileError).NotTo(HaveOccurred())
-				Expect(getRemediationError).NotTo(HaveOccurred())
-				tmp := createMachine(underTest)
-				err := reconciler.Client.Get(context.Background(), client.ObjectKey{Namespace: defaultNamespace, Name: dummyMachine}, tmp)
-				Expect(err).NotTo(HaveOccurred())
-
+				tmp := &unstructured.Unstructured{}
+				tmp.SetKind(machineKind)
+				tmp.SetAPIVersion("mock.api.version/alpha")
+				Consistently(func() error {
+					return k8sClient.Get(context.Background(), client.ObjectKey{Namespace: defaultNamespace, Name: dummyMachine}, tmp)
+				}, 5*time.Second, 250*time.Millisecond).ShouldNot(HaveOccurred())
 			})
 
 		})

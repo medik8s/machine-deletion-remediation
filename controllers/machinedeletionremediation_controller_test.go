@@ -16,11 +16,15 @@ const (
 	defaultNamespace = "default"
 	dummyMachine     = "dummy-machine"
 	remediationName  = "test-remediation"
+	mockVersion      = "mock.api.version/alpha"
 )
 
-var _ = Describe("Default Remediation CR", func() {
+var _ = Describe("Machine Deletion Remediation CR", func() {
+	var (
+		underTest *v1alpha1.MachineDeletionRemediation
+	)
+
 	Context("Defaults", func() {
-		var underTest *v1alpha1.MachineDeletionRemediation
 
 		BeforeEach(func() {
 			underTest = &v1alpha1.MachineDeletionRemediation{
@@ -45,79 +49,107 @@ var _ = Describe("Default Remediation CR", func() {
 
 	Context("Reconciliation", func() {
 		var (
-			underTest *v1alpha1.MachineDeletionRemediation
+			remediationOwnerMachine *unstructured.Unstructured
+			nonRelatedMachine       *unstructured.Unstructured
 		)
-
-		When("remediation cr exist", func() {
-
-			var (
-				remediationOwnerMachine *unstructured.Unstructured
-				nonRelatedMachine       *unstructured.Unstructured
-				machineDeleted          bool
-			)
-
-			BeforeEach(func() {
-				underTest = &v1alpha1.MachineDeletionRemediation{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      remediationName,
-						Namespace: defaultNamespace,
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       machineKind,
-								APIVersion: "mock.api.version/alpha",
-								Name:       remediationName,
-								UID:        "1",
-							},
+		JustBeforeEach(func() {
+			Expect(k8sClient.Create(context.Background(), underTest)).ToNot(HaveOccurred())
+		})
+		BeforeEach(func() {
+			underTest = &v1alpha1.MachineDeletionRemediation{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      remediationName,
+					Namespace: defaultNamespace,
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							Kind:       machineKind,
+							APIVersion: mockVersion,
+							Name:       remediationName,
+							UID:        "1",
 						},
 					},
-				}
-				remediationOwnerMachine = createMachine(underTest)
+				},
+			}
+			remediationOwnerMachine = createMachine(underTest)
+			nonRelatedMachine = createMachine(underTest)
+			nonRelatedMachine.SetName(dummyMachine)
+		})
+		AfterEach(func() {
+			if err := k8sClient.Delete(context.Background(), remediationOwnerMachine); err != nil {
+				Expect(errors.IsNotFound(err)).To(BeTrue())
+			}
+			if err := k8sClient.Delete(context.Background(), nonRelatedMachine); err != nil {
+				Expect(errors.IsNotFound(err)).To(BeTrue())
+			}
+			Expect(k8sClient.Delete(context.Background(), underTest)).ToNot(HaveOccurred())
+		})
 
-				nonRelatedMachine = createMachine(underTest)
-				nonRelatedMachine.SetName(dummyMachine)
-
+		When("remediation cr exist with machine", func() {
+			BeforeEach(func() {
 				Expect(k8sClient.Create(context.Background(), remediationOwnerMachine)).ToNot(HaveOccurred())
 				Expect(k8sClient.Create(context.Background(), nonRelatedMachine)).ToNot(HaveOccurred())
-				Expect(k8sClient.Create(context.Background(), underTest)).ToNot(HaveOccurred())
-			})
-
-			AfterEach(func() {
-				if !machineDeleted {
-					Expect(k8sClient.Delete(context.Background(), remediationOwnerMachine)).ToNot(HaveOccurred())
-				}
-				Expect(k8sClient.Delete(context.Background(), nonRelatedMachine)).ToNot(HaveOccurred())
-				Expect(k8sClient.Delete(context.Background(), underTest)).ToNot(HaveOccurred())
 			})
 
 			It("Machine referenced from remediation should be deleted", func() {
 				tmp := &unstructured.Unstructured{}
 				tmp.SetKind(machineKind)
-				tmp.SetAPIVersion("mock.api.version/alpha")
+				tmp.SetAPIVersion(mockVersion)
 				Eventually(func() bool {
 					return errors.IsNotFound(k8sClient.Get(context.Background(), client.ObjectKey{Namespace: defaultNamespace, Name: remediationName}, tmp))
 				}, 5*time.Second, 250*time.Millisecond).Should(BeTrue())
-				machineDeleted = true
 			})
 
 			It("Machine not referenced from remediation should not be deleted", func() {
 				tmp := &unstructured.Unstructured{}
 				tmp.SetKind(machineKind)
-				tmp.SetAPIVersion("mock.api.version/alpha")
+				tmp.SetAPIVersion(mockVersion)
 				Consistently(func() error {
 					return k8sClient.Get(context.Background(), client.ObjectKey{Namespace: defaultNamespace, Name: dummyMachine}, tmp)
 				}, 5*time.Second, 250*time.Millisecond).ShouldNot(HaveOccurred())
 			})
 
 		})
+
+		When("remediation cr exist but machine doesn't exist", func() {
+
+			It("Should not crash when remediation exist but machine does not", func() {
+				tmp := &unstructured.Unstructured{}
+				tmp.SetKind(machineKind)
+				tmp.SetAPIVersion(mockVersion)
+				Expect(errors.IsNotFound(k8sClient.Get(context.Background(), client.ObjectKey{Namespace: defaultNamespace, Name: remediationName}, tmp))).To(BeTrue())
+
+			})
+
+		})
+
+		When("remediation cr doesn't have a machine owner ref", func() {
+			BeforeEach(func() {
+				underTest.OwnerReferences = nil
+				Expect(k8sClient.Create(context.Background(), remediationOwnerMachine)).ToNot(HaveOccurred())
+			})
+
+			It("machine should not be deleted when remediation has no owner ref", func() {
+
+				tmp := &unstructured.Unstructured{}
+				tmp.SetKind(machineKind)
+				tmp.SetAPIVersion(mockVersion)
+
+				Consistently(func() error {
+					return k8sClient.Get(context.Background(), client.ObjectKey{Namespace: defaultNamespace, Name: remediationName}, tmp)
+				}).ShouldNot(HaveOccurred())
+
+			})
+
+		})
+
 	})
 
 })
 
 func createMachine(remediation *v1alpha1.MachineDeletionRemediation) *unstructured.Unstructured {
 	machine := new(unstructured.Unstructured)
-	ownRef := remediation.OwnerReferences[0]
 	machine.SetKind(machineKind)
-	machine.SetAPIVersion(ownRef.APIVersion)
+	machine.SetAPIVersion(mockVersion) //remediation.OwnerReferences[0].APIVersion
 	machine.SetNamespace(remediation.Namespace)
 	machine.SetName(remediation.Name)
 	return machine

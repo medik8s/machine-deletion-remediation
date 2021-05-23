@@ -101,7 +101,7 @@ func (r *MachineDeletionRemediationReconciler) deleteMachine(ctx context.Context
 			r.Log.Error(err, "error deleting machine %s in namespace %s: %v", machine.GetName(), machine.GetNamespace())
 			return err
 		}
-		r.Log.Info("machine: %s in namespace: %s is deleted , but remediation still exist", machine.GetName(), machine.GetNamespace(), err)
+		r.Log.Info("machine: %s in namespace: %s is deleted , but remediation still exist", machine.GetName(), machine.GetNamespace())
 	}
 	return nil
 }

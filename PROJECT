@@ -1,4 +1,4 @@
-domain: example.com
+domain: medik8s.io
 layout:
 - go.kubebuilder.io/v3
 plugins:
@@ -11,7 +11,7 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: example.com
+  domain: medik8s.io
   group: app
   kind: MachineDeletionRemediation
   path: github.com/medik8s/machine-deletion-remediation/api/v1alpha1
@@ -20,7 +20,7 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: example.com
+  domain: medik8s.io
   group: app
   kind: MachineDeletionRemediationTemplate
   path: github.com/medik8s/machine-deletion-remediation/api/v1alpha1

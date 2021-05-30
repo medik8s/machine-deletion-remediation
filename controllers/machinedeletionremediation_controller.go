@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -58,6 +59,10 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 
 	log.Info("reconciling...")
 
+	tmp := []string{}
+	if tmp == nil{
+		fmt.Println("Crapy Code")
+	}
 	//fetch the remediation
 	var remediation *v1alpha1.MachineDeletionRemediation
 	if remediation = r.getRemediation(ctx, req); remediation == nil {

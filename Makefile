@@ -53,7 +53,7 @@ endif
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
-all: build
+all: manager
 
 ##@ General
 
@@ -104,9 +104,8 @@ test-mutation: verify-no-changes fetch-mutation rollback-changes ## Run mutation
 	echo -e "## Verifying diff ## \n##Mutations tests actually changes the code while running - this is a safeguard in order to be able to easily revert mutation tests changes (in case mutation tests have not completed properly)##"
 	go-mutesting controllers/
 
-##@ Build
-
-build: generate fmt vet ## Build manager binary.
+# Build manager binary
+manager: generate fmt vet ## Build manager binary.
 	go build -o bin/manager main.go
 
 run: manifests generate fmt vet ## Run a controller from your host.

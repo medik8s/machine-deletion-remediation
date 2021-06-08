@@ -44,6 +44,12 @@ var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
 
+const (
+	envVarApiServer = "TEST_ASSET_KUBE_APISERVER"
+	envVarETCD      = "TEST_ASSET_ETCD"
+	envVarKUBECTL   = "TEST_ASSET_KUBECTL"
+)
+
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
@@ -53,9 +59,15 @@ func TestAPIs(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	Expect(os.Setenv("TEST_ASSET_KUBE_APISERVER", "../testbin/bin/kube-apiserver")).To(Succeed())
-	Expect(os.Setenv("TEST_ASSET_ETCD", "../testbin/bin/etcd")).To(Succeed())
-	Expect(os.Setenv("TEST_ASSET_KUBECTL", "../testbin/bin/kubectl")).To(Succeed())
+	if _, isFound := os.LookupEnv(envVarApiServer); !isFound {
+		Expect(os.Setenv(envVarApiServer, "../testbin/bin/kube-apiserver")).To(Succeed())
+	}
+	if _, isFound := os.LookupEnv(envVarETCD); !isFound {
+		Expect(os.Setenv(envVarETCD, "../testbin/bin/etcd")).To(Succeed())
+	}
+	if _, isFound := os.LookupEnv(envVarKUBECTL); !isFound {
+		Expect(os.Setenv(envVarKUBECTL, "../testbin/bin/kubectl")).To(Succeed())
+	}
 
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
@@ -107,7 +119,7 @@ var _ = AfterSuite(func() {
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 
-	Expect(os.Unsetenv("TEST_ASSET_KUBE_APISERVER")).To(Succeed())
-	Expect(os.Unsetenv("TEST_ASSET_ETCD")).To(Succeed())
-	Expect(os.Unsetenv("TEST_ASSET_KUBECTL")).To(Succeed())
+	Expect(os.Unsetenv(envVarApiServer)).To(Succeed())
+	Expect(os.Unsetenv(envVarETCD)).To(Succeed())
+	Expect(os.Unsetenv(envVarKUBECTL)).To(Succeed())
 })

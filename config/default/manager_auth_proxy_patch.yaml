@@ -6,11 +6,18 @@ metadata:
   name: controller-manager
   namespace: system
 spec:
+  automountServiceAccountToken: false
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 11000
   template:
     spec:
       containers:
       - name: kube-rbac-proxy
         image: gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
+        resources:
+          limits:
+            memory: "200Mi"
         args:
         - "--secure-listen-address=0.0.0.0:8443"
         - "--upstream=http://127.0.0.1:8080/"
@@ -20,6 +27,16 @@ spec:
         - containerPort: 8443
           name: https
       - name: manager
+        resources:
+          limits:
+            memory: "200Mi"
+        env:
+          - name: MY_NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          - name: MACHINE_DELETION_REMEDIATION_IMAGE
+            value: quay.io/medik8s/machine-deletion-remediation-operator:latest
         args:
         - "--health-probe-bind-address=:8081"
         - "--metrics-bind-address=127.0.0.1:8080"

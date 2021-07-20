@@ -1,0 +1,21 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: machine-deletion-remediation-ext-remediation
+  labels:
+    rbac.ext-remediation/aggregate-to-ext-remediation: "true"
+rules:
+  - apiGroups:
+      - machine-deletion-remediation.medik8s.io
+    resources:
+      - machinedeleteionremediationtemplates
+    verbs:
+      - get
+  - apiGroups:
+      - machine-deletion-remediation.medik8s.io
+    resources:
+      - machinedeleteionremediations
+    verbs:
+      - get
+      - create
+      - delete

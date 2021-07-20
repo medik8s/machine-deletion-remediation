@@ -14,13 +14,13 @@ spec:
         API
       displayName: Machine Deletion Remediation
       kind: MachineDeletionRemediation
-      name: machinedeletionremediations.app.example.com
+      name: machinedeletionremediations.machine-deletion-remediation.medik8s.io
       version: v1alpha1
     - description: MachineDeletionRemediationTemplate is the Schema for the machinedeletionremediationtemplates
         API
       displayName: Machine Deletion Remediation Template
       kind: MachineDeletionRemediationTemplate
-      name: machinedeletionremediationtemplates.app.example.com
+      name: machinedeletionremediationtemplates.machine-deletion-remediation.medik8s.io
       version: v1alpha1
   description: machine-deletion-remediation operator
   displayName: machine-deletion-remediation

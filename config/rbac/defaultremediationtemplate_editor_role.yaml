@@ -5,7 +5,7 @@ metadata:
   name: machinedeleteionremediationtemplate-editor-role
 rules:
 - apiGroups:
-  - app.example.com
+  - machine-deletion-remediation.medik8s.io
   resources:
   - machinedeleteionremediationtemplates
   verbs:
@@ -17,7 +17,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - app.example.com
+  - machine-deletion-remediation.medik8s.io
   resources:
   - machinedeleteionremediationtemplates/status
   verbs:

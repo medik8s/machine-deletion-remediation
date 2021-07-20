@@ -1,4 +1,4 @@
-apiVersion: app.example.com/v1alpha1
+apiVersion: machine-deletion-remediation.medik8s.io/v1alpha1
 kind: MachineDeletionRemediationTemplate
 metadata:
   name: machinedeletionremediationtemplate-sample

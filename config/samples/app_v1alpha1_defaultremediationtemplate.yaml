@@ -1,7 +1,0 @@
-apiVersion: machine-deletion-remediation.medik8s.io/v1alpha1
-kind: MachinedeleteionremediationTemplate
-metadata:
-  name: machinedeleteionremediationtemplate-sample
-spec:
-  # Add fields here
-  foo: bar

@@ -1,7 +1,7 @@
 apiVersion: app.example.com/v1alpha1
-kind: DefaultRemediationTemplate
+kind: MachinedeleteionremediationTemplate
 metadata:
-  name: defaultremediationtemplate-sample
+  name: machinedeleteionremediationtemplate-sample
 spec:
   # Add fields here
   foo: bar

@@ -1,13 +1,13 @@
-# permissions for end users to edit defaultremediations.
+# permissions for end users to edit machinedeleteionremediations.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: defaultremediation-editor-role
+  name: machinedeleteionremediation-editor-role
 rules:
 - apiGroups:
   - app.example.com
   resources:
-  - defaultremediations
+  - machinedeleteionremediations
   verbs:
   - create
   - delete
@@ -19,6 +19,6 @@ rules:
 - apiGroups:
   - app.example.com
   resources:
-  - defaultremediations/status
+  - machinedeleteionremediations/status
   verbs:
   - get

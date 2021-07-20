@@ -1,13 +1,13 @@
-# permissions for end users to view defaultremediations.
+# permissions for end users to view machinedeleteionremediation.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: defaultremediation-viewer-role
+  name: machinedeleteionremediation-viewer-role
 rules:
 - apiGroups:
   - app.example.com
   resources:
-  - defaultremediations
+  - machinedeleteionremediations
   verbs:
   - get
   - list
@@ -15,6 +15,6 @@ rules:
 - apiGroups:
   - app.example.com
   resources:
-  - defaultremediations/status
+  - machinedeleteionremediations/status
   verbs:
   - get

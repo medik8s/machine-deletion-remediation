@@ -17,5 +17,6 @@ rules:
       - machinedeleteions
     verbs:
       - get
+      - list
       - create
       - delete

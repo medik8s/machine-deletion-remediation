@@ -10,13 +10,13 @@ This operator conforms to the External Remediation of [NodeHealthCheck](https://
 
 ## Installation
 - Deploy MDR (Machine-deletion-remediation) to a container in the cluster pod.  Try `make deploy`, official images comming soon.
-- Load the yaml manifest of the MDR template.
-- Modifying NHC CR so it'll use MDR as it's remediator.
+- Load the yaml manifest of the MDR template (see below).
+- Modifying NodeHealthCheck CR to use MDR as it's remediator.
 This is basically a specific use case of an External Remediation of [NodeHealthCheck](https://github.com/medik8s/node-healthcheck-operator#readme).
 In order to set up: make sure that Node Health Check is running, Machine-deletion-remediation controller exists and then create the necessary CRs.
 
 ## Example CRs
-An exmaple MDR template object.
+An example MDR template object.
 ```yaml
    apiVersion: machine.remediation.medik8s.io/v1alpha1
    kind: MachineDeletionRemediationTemplate

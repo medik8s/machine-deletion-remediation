@@ -33,7 +33,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/medik8s/machine-deletion-remediation/api/v1alpha1"
+	"github.com/medik8s/machine-deletion/api/v1alpha1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -97,9 +97,9 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&MachineDeletionRemediationReconciler{
+	err = (&MachineDeletionReconciler{
 		Client: k8sManager.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("machine-deletion-remediation-controller"),
+		Log:    ctrl.Log.WithName("controllers").WithName("machine-deletion-controller"),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 

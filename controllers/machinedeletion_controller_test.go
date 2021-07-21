@@ -2,7 +2,7 @@ package controllers
 
 import (
 	"context"
-	"github.com/medik8s/machine-deletion-remediation/api/v1alpha1"
+	"github.com/medik8s/machine-deletion/api/v1alpha1"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -21,13 +21,13 @@ const (
 
 var _ = Describe("Machine Deletion Remediation CR", func() {
 	var (
-		underTest *v1alpha1.MachineDeletionRemediation
+		underTest *v1alpha1.MachineDeletion
 	)
 
 	Context("Defaults", func() {
 
 		BeforeEach(func() {
-			underTest = &v1alpha1.MachineDeletionRemediation{
+			underTest = &v1alpha1.MachineDeletion{
 				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: defaultNamespace},
 			}
 			err := k8sClient.Create(context.Background(), underTest)
@@ -56,7 +56,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 			Expect(k8sClient.Create(context.Background(), underTest)).ToNot(HaveOccurred())
 		})
 		BeforeEach(func() {
-			underTest = &v1alpha1.MachineDeletionRemediation{
+			underTest = &v1alpha1.MachineDeletion{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      remediationName,
 					Namespace: defaultNamespace,
@@ -146,7 +146,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 })
 
-func createMachine(remediation *v1alpha1.MachineDeletionRemediation) *unstructured.Unstructured {
+func createMachine(remediation *v1alpha1.MachineDeletion) *unstructured.Unstructured {
 	machine := new(unstructured.Unstructured)
 	machine.SetKind(machineKind)
 	machine.SetAPIVersion(mockVersion) //remediation.OwnerReferences[0].APIVersion

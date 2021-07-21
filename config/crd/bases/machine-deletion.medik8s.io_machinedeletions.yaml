@@ -6,20 +6,20 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.5.0
   creationTimestamp: null
-  name: machinedeletionremediations.machine-deletion-remediation.medik8s.io
+  name: machinedeletions.machine-deletion.medik8s.io
 spec:
-  group: machine-deletion-remediation.medik8s.io
+  group: machine-deletion.medik8s.io
   names:
-    kind: MachineDeletionRemediation
-    listKind: MachineDeletionRemediationList
-    plural: machinedeletionremediations
-    singular: machinedeletionremediation
+    kind: MachineDeletion
+    listKind: MachineDeletionList
+    plural: machinedeletions
+    singular: machinedeletion
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: MachineDeletionRemediation is the Schema for the machinedeletionremediations API
+        description: MachineDeletion is the Schema for the machinedeletions API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
@@ -30,10 +30,10 @@ spec:
           metadata:
             type: object
           spec:
-            description: MachineDeletionRemediationSpec defines the desired state of MachineDeletionRemediation
+            description: MachineDeletionSpec defines the desired state of MachineDeletion
             type: object
           status:
-            description: MachineDeletionRemediationStatus defines the observed state of MachineDeletionRemediation
+            description: MachineDeletionStatus defines the observed state of MachineDeletion
             type: object
         type: object
     served: true

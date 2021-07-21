@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/default-remediation-operator.iml" filepath="$PROJECT_DIR$/.idea/default-remediation-operator.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../machine-deletion/.idea/machine-deletion-operator.iml" filepath="$PROJECT_DIR$/../machine-deletion/.idea/machine-deletion-operator.iml" />
     </modules>
   </component>
 </project>

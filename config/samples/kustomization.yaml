@@ -1,5 +1,5 @@
 ## Append samples you want in your CSV to this file as resources ##
 resources:
-- app_v1alpha1_machinedeletionremediation.yaml
-- app_v1alpha1_machinedeletionremediationtemplate.yaml
+- app_v1alpha1_machinedeletion.yaml
+- app_v1alpha1_machinedeletiontemplate.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

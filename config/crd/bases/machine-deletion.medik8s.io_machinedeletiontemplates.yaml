@@ -6,20 +6,20 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.5.0
   creationTimestamp: null
-  name: machinedeletionremediationtemplates.machine-deletion-remediation.medik8s.io
+  name: machinedeletiontemplates.machine-deletion.medik8s.io
 spec:
-  group: machine-deletion-remediation.medik8s.io
+  group: machine-deletion.medik8s.io
   names:
-    kind: MachineDeletionRemediationTemplate
-    listKind: MachineDeletionRemediationTemplateList
-    plural: machinedeletionremediationtemplates
-    singular: machinedeletionremediationtemplate
+    kind: MachineDeletionTemplate
+    listKind: MachineDeletionTemplateList
+    plural: machinedeletiontemplates
+    singular: machinedeletiontemplate
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: MachineDeletionRemediationTemplate is the Schema for the machinedeletionremediationtemplates API
+        description: MachineDeletionTemplate is the Schema for the machinedeletiontemplates API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
@@ -30,10 +30,10 @@ spec:
           metadata:
             type: object
           spec:
-            description: MachineDeletionRemediationTemplateSpec defines the desired state of MachineDeletionRemediationTemplate
+            description: MachineDeletionTemplateSpec defines the desired state of MachineDeletionTemplate
             type: object
           status:
-            description: MachineDeletionRemediationTemplateStatus defines the observed state of MachineDeletionRemediationTemplate
+            description: MachineDeletionTemplateStatus defines the observed state of MachineDeletionTemplate
             type: object
         type: object
     served: true

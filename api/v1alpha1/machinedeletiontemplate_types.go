@@ -23,15 +23,15 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// MachineDeletionRemediationSpec defines the desired state of MachineDeletionRemediation
-type MachineDeletionRemediationSpec struct {
+// MachineDeletionTemplateSpec defines the desired state of MachineDeletionTemplate
+type MachineDeletionTemplateSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
 }
 
-// MachineDeletionRemediationStatus defines the observed state of MachineDeletionRemediation
-type MachineDeletionRemediationStatus struct {
+// MachineDeletionTemplateStatus defines the observed state of MachineDeletionTemplate
+type MachineDeletionTemplateStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 }
@@ -39,24 +39,24 @@ type MachineDeletionRemediationStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// MachineDeletionRemediation is the Schema for the machinedeletionremediations API
-type MachineDeletionRemediation struct {
+// MachineDeletionTemplate is the Schema for the machinedeletiontemplates API
+type MachineDeletionTemplate struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   MachineDeletionRemediationSpec   `json:"spec,omitempty"`
-	Status MachineDeletionRemediationStatus `json:"status,omitempty"`
+	Spec   MachineDeletionTemplateSpec   `json:"spec,omitempty"`
+	Status MachineDeletionTemplateStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// MachineDeletionRemediationList contains a list of MachineDeletionRemediation
-type MachineDeletionRemediationList struct {
+// MachineDeletionTemplateList contains a list of MachineDeletionTemplate
+type MachineDeletionTemplateList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []MachineDeletionRemediation `json:"items"`
+	Items           []MachineDeletionTemplate `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&MachineDeletionRemediation{}, &MachineDeletionRemediationList{})
+	SchemeBuilder.Register(&MachineDeletionTemplate{}, &MachineDeletionTemplateList{})
 }

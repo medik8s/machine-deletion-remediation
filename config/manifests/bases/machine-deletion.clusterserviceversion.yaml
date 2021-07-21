@@ -1,0 +1,55 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: '[]'
+    capabilities: Basic Install
+  name: machine-deletion.v0.0.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: MachineDeletion is the Schema for the machinedeletions
+        API
+      displayName: Machine Deletion
+      kind: MachineDeletion
+      name: machinedeletions.machine-deletion.medik8s.io
+      version: v1alpha1
+    - description: MachineDeletionTemplate is the Schema for the machinedeletiontemplates
+        API
+      displayName: Machine Deletion Template
+      kind: MachineDeletionTemplate
+      name: machinedeletiontemplates.machine-deletion.medik8s.io
+      version: v1alpha1
+  description: machine-deletion operator
+  displayName: machine-deletion
+  icon:
+  - base64data: ""
+    mediatype: ""
+  install:
+    spec:
+      deployments: null
+    strategy: ""
+  installModes:
+  - supported: false
+    type: OwnNamespacell
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - machine
+  - deletion
+  links:
+  - name: Machine Deletion
+    url: https://machine-deletion.domain
+  maintainers:
+  - email: mshitrit@redhat.com
+    name: Michael Shitrit
+  maturity: alpha
+  provider:
+    name: Michael Shitrit
+  version: 0.0.0

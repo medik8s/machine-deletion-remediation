@@ -1,34 +1,20 @@
-
----
+# permissions for end users to view machinedeletions.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  creationTimestamp: null
-  name: manager-role
+  name: machinedeletion-viewer-role
 rules:
 - apiGroups:
   - machine-deletion.medik8s.io
   resources:
   - machinedeletions
   verbs:
-  - create
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
-- apiGroups:
-  - machine-deletion.medik8s.io
-  resources:
-  - machinedeletions/finalizers
-  verbs:
-  - update
 - apiGroups:
   - machine-deletion.medik8s.io
   resources:
   - machinedeletions/status
   verbs:
   - get
-  - patch
-  - update

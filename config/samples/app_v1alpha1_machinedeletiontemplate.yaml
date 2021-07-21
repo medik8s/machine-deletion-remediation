@@ -1,0 +1,7 @@
+apiVersion: machine-deletion.medik8s.io/v1alpha1
+kind: MachineDeletionTemplate
+metadata:
+  name: machinedeletiontemplate-sample
+spec:
+  # Add fields here
+  foo: bar

@@ -18,19 +18,23 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"github.com/go-logr/logr"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"strings"
 
 	"github.com/medik8s/machine-deletion/api/v1alpha1"
 )
 
 const (
-	machineKind = "Machine"
+	machineKind                = "Machine"
+	machineAnnotationOpenshift = "machine.openshift.io/machine"
 )
 
 // MachineDeletionReconciler reconciles a MachineDeletion object
@@ -63,13 +67,21 @@ func (r *MachineDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if remediation = r.getRemediation(ctx, req); remediation == nil {
 		return ctrl.Result{}, nil
 	}
-	//not a machine based remediation
-	machineOwnerRef := getMachineOwnerRef(remediation)
-	if machineOwnerRef == nil {
-		return ctrl.Result{}, nil
+
+	var machine *unstructured.Unstructured
+	//Health check was done by MHC
+	if machineOwnerRef := getMachineOwnerRef(remediation); machineOwnerRef != nil {
+		machine = buildMachineFromOwnerRef(machineOwnerRef, remediation)
+	} else if node, err := r.getNodeFromMdr(remediation); err == nil { //Health check was done by NHC
+		if machine, err = buildMachineFromNode(node); err != nil {
+			return ctrl.Result{}, err
+		}
+	} else { //Failed both in fetching the machine and in fetching the node
+		return ctrl.Result{}, err
 	}
+
 	//delete the machine
-	if err := r.deleteMachine(ctx, buildMachine(machineOwnerRef, remediation)); err != nil {
+	if err := r.deleteMachine(ctx, machine); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -106,7 +118,20 @@ func (r *MachineDeletionReconciler) deleteMachine(ctx context.Context, machine *
 	return nil
 }
 
-func getMachineOwnerRef(remediation *v1alpha1.MachineDeletion) *v1.OwnerReference {
+func (r *MachineDeletionReconciler) getNodeFromMdr(mdr *v1alpha1.MachineDeletion) (*v1.Node, error) {
+	node := &v1.Node{}
+	key := client.ObjectKey{
+		Name:      mdr.Name,
+		Namespace: "",
+	}
+
+	if err := r.Get(context.TODO(), key, node); err != nil {
+		return nil, err
+	}
+	return node, nil
+}
+
+func getMachineOwnerRef(remediation *v1alpha1.MachineDeletion) *metav1.OwnerReference {
 	for _, ownerRef := range remediation.OwnerReferences {
 		if ownerRef.Kind == machineKind {
 			return &ownerRef
@@ -114,11 +139,47 @@ func getMachineOwnerRef(remediation *v1alpha1.MachineDeletion) *v1.OwnerReferenc
 	}
 	return nil
 }
-func buildMachine(ref *v1.OwnerReference, remediation *v1alpha1.MachineDeletion) *unstructured.Unstructured {
+func buildMachineFromOwnerRef(ref *metav1.OwnerReference, remediation *v1alpha1.MachineDeletion) *unstructured.Unstructured {
 	machine := new(unstructured.Unstructured)
 	machine.SetName(remediation.Name)
+	//TODO mshitrit should namespce be taken from ref ?
 	machine.SetNamespace(remediation.Namespace)
 	machine.SetKind(machineKind)
 	machine.SetAPIVersion(ref.APIVersion)
 	return machine
+}
+
+func buildMachineFromNode(node *v1.Node) (*unstructured.Unstructured, error) {
+
+	var nodeAnnotations map[string]string
+	if nodeAnnotations = node.Annotations; nodeAnnotations == nil {
+		return nil, fmt.Errorf("failed to find machine annotation on node name: %s", node.Name)
+	}
+	var machineNameNamespace, machineName, machineNamespace string
+
+	//OpenShift Machine
+	if machineNameNamespace = nodeAnnotations[machineAnnotationOpenshift]; len(machineNameNamespace) == 0 {
+		//TODO mshitrit add support for CAPI machine as well
+		return nil, fmt.Errorf("failed to find openshift machine annotation on node name: %s", node.Name)
+	}
+	machine := new(unstructured.Unstructured)
+
+	machineName, machineNamespace, err := extractNameAndNamespace(machineNameNamespace, node.Name)
+	if err != nil {
+		return nil, err
+	}
+	machine.SetName(machineName)
+	machine.SetNamespace(machineNamespace)
+	machine.SetKind(machineKind)
+	//TODO mshitrit how to fecth APIVersion ? maybe use hardcoded ?
+	//machine.SetAPIVersion(ref.APIVersion)
+
+	return machine, nil
+}
+
+func extractNameAndNamespace(nameNamespace string, nodeName string) (string, string, error) {
+	if nameNamespaceSlice := strings.Split(nameNamespace, "/"); len(nameNamespaceSlice) == 2 {
+		return nameNamespaceSlice[1], nameNamespaceSlice[0], nil
+	}
+	return "", "", fmt.Errorf("failed to extract Machine Name and Machine Namespace from machine annotation on the node for node name: %s", nodeName)
 }

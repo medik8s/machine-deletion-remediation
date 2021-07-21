@@ -16,7 +16,20 @@ This is basically a specific use case of an External Remediation of [NodeHealthC
 In order to set up: make sure that Node Health Check is running, Machine-deletion-remediation controller exists and then create the necessary CRs.
 
 ## Example CRs
-NodeHealthCheck:
+An exmaple MDR template object.
+```yaml
+   apiVersion: machine.remediation.medik8s.io/v1alpha1
+   kind: MachineDeletionRemediationTemplate
+   metadata:
+     name: group-x
+     namespace: default
+   spec:
+     template:
+       spec: {}
+```
+These CRs are created by the admin and are used as a template by NodeHealthCheck for creating the CRs that represent a request for a Node to be recovered.
+
+Configuring NodeHealthCheck to use the example `group-x` template above.
 ```yaml
 apiVersion: remediation.medik8s.io/v1alpha1
 kind: NodeHealthCheck
@@ -29,30 +42,22 @@ spec:
     name: group-x
     namespace: default
 ```
-The remediation template object: this CR is created by the admin, it is used as a template by NHC for creating the remediation object.
-MachineDeletionRemediationTemplate:
-```yaml
-   apiVersion: machine.remediation.medik8s.io/v1alpha1
-   kind: MachineDeletionRemediationTemplate
-   metadata:
-     name: group-x
-     namespace: default
-   spec:
-     template:
-       spec: {}
-```
-A remediation object: these CRs are created by NHC when [...]. The MDR operator watches for them and [...].
-MachineDeletionRemediation:
+While the admin may define many NodeHealthCheck domains, they can all use the same MDR template if desired.
+
+
+An example remediation request for Node `worker-0-21`.
 ```yaml
 apiVersion: machine.remediation.medik8s.io/v1alpha1
 kind: MachineDeletionRemediation
 metadata:
-  # named after the machine
-  name: machine-sample
+  name: worker-0-21
   namespace: default
   ownerReferences:
-    - kind: Machine
+    - kind: NodeHealthCheck
       apiVersion: remediation.medik8s.io/v1alpha1
-      name: machine-sample
+      name: nodehealthcheck-sample
 spec: {}
 ```
+These CRs are created by NodeHealthCheck when it detects a failed node. 
+The MDR operator watches for them to be created, looks up the Machine CR and deletes Node associated with it.
+MDR CRs are deleted by NodeHealthCheck when it sees the Node is healthy again. 

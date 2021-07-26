@@ -8,13 +8,13 @@ rules:
   - apiGroups:
       - machine-deletion.medik8s.io
     resources:
-      - machinedeleteiontemplates
+      - machinedeletiontemplates
     verbs:
       - get
   - apiGroups:
       - machine-deletion.medik8s.io
     resources:
-      - machinedeleteions
+      - machinedeletions
     verbs:
       - get
       - list

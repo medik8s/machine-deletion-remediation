@@ -31,6 +31,18 @@ spec:
             type: object
           spec:
             description: MachineDeletionTemplateSpec defines the desired state of MachineDeletionTemplate
+            properties:
+              template:
+                description: 'INSERT ADDITIONAL SPEC FIELDS - desired state of cluster Important: Run "make" to regenerate code after modifying this file'
+                properties:
+                  spec:
+                    description: MachineDeletionSpec defines the desired state of MachineDeletion
+                    type: object
+                required:
+                - spec
+                type: object
+            required:
+            - template
             type: object
           status:
             description: MachineDeletionTemplateStatus defines the observed state of MachineDeletionTemplate

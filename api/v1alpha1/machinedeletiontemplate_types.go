@@ -32,9 +32,7 @@ type MachineDeletionTemplateSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 	Template MachineDeletionTemplateResource `json:"template"`
-
 }
-
 
 // MachineDeletionTemplateStatus defines the observed state of MachineDeletionTemplate
 type MachineDeletionTemplateStatus struct {

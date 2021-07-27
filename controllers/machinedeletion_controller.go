@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-logr/logr"
+	"github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,8 +34,10 @@ import (
 )
 
 const (
-	machineKind                = "Machine"
 	machineAnnotationOpenshift = "machine.openshift.io/machine"
+	//TODO mshitrit is it possible to grab those kinds from machine-api-operator instead of hardcoded ?
+	machineKind    = "Machine"
+	machineSetKind = "MachineSet"
 )
 
 // MachineDeletionReconciler reconciles a MachineDeletion object
@@ -47,10 +50,10 @@ type MachineDeletionReconciler struct {
 //+kubebuilder:rbac:groups=machine-deletion.medik8s.io,resources=machinedeletions,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=machine-deletion.medik8s.io,resources=machinedeletions/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=machine-deletion.medik8s.io,resources=machinedeletions/finalizers,verbs=update
+//+kubebuilder:rbac:groups=machine.openshift.io,resources=machines,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
 // the MachineDeletion object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
@@ -70,12 +73,18 @@ func (r *MachineDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	var machine *unstructured.Unstructured
 	//Health check was done by MHC
-	if machineOwnerRef := getMachineOwnerRef(remediation); machineOwnerRef != nil {
-		machine = buildMachineFromOwnerRef(machineOwnerRef, remediation)
+	//TODO mshitrit is this use case redundant ?
+	if machineOwnerRef := r.getMachineOwnerRef(remediation); machineOwnerRef != nil {
+		machine = r.buildMachineFromOwnerRef(machineOwnerRef, remediation)
 	} else if node, err := r.getNodeFromMdr(remediation); err == nil { //Health check was done by NHC
-		if machine, err = buildMachineFromNode(node); err != nil {
+		if machine, err = r.buildMachineFromNode(node); err != nil {
 			return ctrl.Result{}, err
 		}
+		//TODO mshitrit looks like NHC only watches worker nodes so this might be redundant
+		if isMasterNode(machine) {
+			return ctrl.Result{}, nil
+		}
+
 	} else { //Failed both in fetching the machine and in fetching the node
 		return ctrl.Result{}, err
 	}
@@ -86,6 +95,16 @@ func (r *MachineDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func isMasterNode(machine *unstructured.Unstructured) bool {
+	refs := machine.GetOwnerReferences()
+	for _, ref := range refs {
+		if ref.Kind == machineSetKind {
+			return false
+		}
+	}
+	return true
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -121,8 +140,7 @@ func (r *MachineDeletionReconciler) deleteMachine(ctx context.Context, machine *
 func (r *MachineDeletionReconciler) getNodeFromMdr(mdr *v1alpha1.MachineDeletion) (*v1.Node, error) {
 	node := &v1.Node{}
 	key := client.ObjectKey{
-		Name:      mdr.Name,
-		Namespace: "",
+		Name: mdr.Name,
 	}
 
 	if err := r.Get(context.TODO(), key, node); err != nil {
@@ -131,7 +149,7 @@ func (r *MachineDeletionReconciler) getNodeFromMdr(mdr *v1alpha1.MachineDeletion
 	return node, nil
 }
 
-func getMachineOwnerRef(remediation *v1alpha1.MachineDeletion) *metav1.OwnerReference {
+func (r *MachineDeletionReconciler) getMachineOwnerRef(remediation *v1alpha1.MachineDeletion) *metav1.OwnerReference {
 	for _, ownerRef := range remediation.OwnerReferences {
 		if ownerRef.Kind == machineKind {
 			return &ownerRef
@@ -139,7 +157,7 @@ func getMachineOwnerRef(remediation *v1alpha1.MachineDeletion) *metav1.OwnerRefe
 	}
 	return nil
 }
-func buildMachineFromOwnerRef(ref *metav1.OwnerReference, remediation *v1alpha1.MachineDeletion) *unstructured.Unstructured {
+func (r *MachineDeletionReconciler) buildMachineFromOwnerRef(ref *metav1.OwnerReference, remediation *v1alpha1.MachineDeletion) *unstructured.Unstructured {
 	machine := new(unstructured.Unstructured)
 	machine.SetName(remediation.Name)
 	//TODO mshitrit should namespce be taken from ref ?
@@ -149,31 +167,37 @@ func buildMachineFromOwnerRef(ref *metav1.OwnerReference, remediation *v1alpha1.
 	return machine
 }
 
-func buildMachineFromNode(node *v1.Node) (*unstructured.Unstructured, error) {
+func (r *MachineDeletionReconciler) buildMachineFromNode(node *v1.Node) (*unstructured.Unstructured, error) {
 
 	var nodeAnnotations map[string]string
 	if nodeAnnotations = node.Annotations; nodeAnnotations == nil {
 		return nil, fmt.Errorf("failed to find machine annotation on node name: %s", node.Name)
 	}
-	var machineNameNamespace, machineName, machineNamespace string
+	var machineNameNamespace, machineName string
 
 	//OpenShift Machine
 	if machineNameNamespace = nodeAnnotations[machineAnnotationOpenshift]; len(machineNameNamespace) == 0 {
 		//TODO mshitrit add support for CAPI machine as well
 		return nil, fmt.Errorf("failed to find openshift machine annotation on node name: %s", node.Name)
 	}
-	machine := new(unstructured.Unstructured)
 
 	machineName, machineNamespace, err := extractNameAndNamespace(machineNameNamespace, node.Name)
 	if err != nil {
 		return nil, err
 	}
-	machine.SetName(machineName)
-	machine.SetNamespace(machineNamespace)
-	machine.SetKind(machineKind)
-	//TODO mshitrit how to fecth APIVersion ? maybe use hardcoded ?
-	//machine.SetAPIVersion(ref.APIVersion)
 
+	machine := new(unstructured.Unstructured)
+	machine.SetKind(machineKind)
+	machine.SetAPIVersion(v1beta1.SchemeGroupVersion.String())
+
+	key := client.ObjectKey{
+		Name:      machineName,
+		Namespace: machineNamespace,
+	}
+
+	if err := r.Get(context.TODO(), key, machine); err != nil {
+		return nil, err
+	}
 	return machine, nil
 }
 

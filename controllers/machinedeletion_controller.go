@@ -23,7 +23,6 @@ import (
 	"github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -35,7 +34,6 @@ import (
 
 const (
 	machineAnnotationOpenshift = "machine.openshift.io/machine"
-	//TODO mshitrit is it possible to grab those kinds from machine-api-operator instead of hardcoded ?
 	machineKind    = "Machine"
 	machineSetKind = "MachineSet"
 )
@@ -72,16 +70,12 @@ func (r *MachineDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	var machine *unstructured.Unstructured
-	//Health check was done by MHC
-	//TODO mshitrit is this use case redundant ?
-	if machineOwnerRef := r.getMachineOwnerRef(remediation); machineOwnerRef != nil {
-		machine = r.buildMachineFromOwnerRef(machineOwnerRef, remediation)
-	} else if node, err := r.getNodeFromMdr(remediation); err == nil { //Health check was done by NHC
+	//Health check was done by NHC
+	if node, err := r.getNodeFromMdr(remediation); err == nil {
 		if machine, err = r.buildMachineFromNode(node); err != nil {
 			return ctrl.Result{}, err
 		}
-		//TODO mshitrit looks like NHC only watches worker nodes so this might be redundant
-		if isMasterNode(machine) {
+		if isMachineBelongToMasterNode(machine) {
 			return ctrl.Result{}, nil
 		}
 
@@ -97,7 +91,7 @@ func (r *MachineDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	return ctrl.Result{}, nil
 }
 
-func isMasterNode(machine *unstructured.Unstructured) bool {
+func isMachineBelongToMasterNode(machine *unstructured.Unstructured) bool {
 	refs := machine.GetOwnerReferences()
 	for _, ref := range refs {
 		if ref.Kind == machineSetKind {
@@ -149,24 +143,6 @@ func (r *MachineDeletionReconciler) getNodeFromMdr(mdr *v1alpha1.MachineDeletion
 	return node, nil
 }
 
-func (r *MachineDeletionReconciler) getMachineOwnerRef(remediation *v1alpha1.MachineDeletion) *metav1.OwnerReference {
-	for _, ownerRef := range remediation.OwnerReferences {
-		if ownerRef.Kind == machineKind {
-			return &ownerRef
-		}
-	}
-	return nil
-}
-func (r *MachineDeletionReconciler) buildMachineFromOwnerRef(ref *metav1.OwnerReference, remediation *v1alpha1.MachineDeletion) *unstructured.Unstructured {
-	machine := new(unstructured.Unstructured)
-	machine.SetName(remediation.Name)
-	//TODO mshitrit should namespce be taken from ref ?
-	machine.SetNamespace(remediation.Namespace)
-	machine.SetKind(machineKind)
-	machine.SetAPIVersion(ref.APIVersion)
-	return machine
-}
-
 func (r *MachineDeletionReconciler) buildMachineFromNode(node *v1.Node) (*unstructured.Unstructured, error) {
 
 	var nodeAnnotations map[string]string
@@ -177,7 +153,6 @@ func (r *MachineDeletionReconciler) buildMachineFromNode(node *v1.Node) (*unstru
 
 	//OpenShift Machine
 	if machineNameNamespace = nodeAnnotations[machineAnnotationOpenshift]; len(machineNameNamespace) == 0 {
-		//TODO mshitrit add support for CAPI machine as well
 		return nil, fmt.Errorf("failed to find openshift machine annotation on node name: %s", node.Name)
 	}
 

@@ -34,8 +34,8 @@ import (
 
 const (
 	machineAnnotationOpenshift = "machine.openshift.io/machine"
-	machineKind    = "Machine"
-	machineSetKind = "MachineSet"
+	machineKind                = "Machine"
+	machineSetKind             = "MachineSet"
 )
 
 // MachineDeletionReconciler reconciles a MachineDeletion object

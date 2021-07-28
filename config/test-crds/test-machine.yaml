@@ -2,9 +2,9 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: machines.mock.api.version
+  name: machines.machine.openshift.io
 spec:
-  group: mock.api.version
+  group: machine.openshift.io
   names:
     kind: Machine
     listKind: MachineList
@@ -12,7 +12,7 @@ spec:
     singular: machine
   scope: Namespaced
   versions:
-    - name: alpha
+    - name: v1beta1
       schema:
         openAPIV3Schema:
           type: object

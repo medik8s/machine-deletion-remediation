@@ -36,6 +36,11 @@ const (
 	machineAnnotationOpenshift = "machine.openshift.io/machine"
 	machineKind                = "Machine"
 	machineSetKind             = "MachineSet"
+	//Errors
+	noAnnotationsError                 = "failed to find machine annotation on node name: %s"
+	noMachineAnnotationError           = "failed to find openshift machine annotation on node name: %s"
+	invalidValueMachineAnnotationError = "failed to extract Machine Name and Machine Namespace from machine annotation on the node for node name: %s"
+	failedToDeleteMachineError         = "failed to delete machine of node name: %s"
 )
 
 // MachineDeletionReconciler reconciles a MachineDeletion object
@@ -83,12 +88,27 @@ func (r *MachineDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
-	//delete the machine
-	if err := r.deleteMachine(ctx, machine); err != nil {
+	if err := r.deleteMachineOfNode(ctx, machine, remediation.Name); err != nil {
 		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *MachineDeletionReconciler) deleteMachineOfNode(ctx context.Context, machine *unstructured.Unstructured, nodeName string) error {
+	//delete the machine
+	_ = r.Client.Delete(ctx, machine)
+
+	key := client.ObjectKey{
+		Name:      machine.GetName(),
+		Namespace: machine.GetNamespace(),
+	}
+
+	//verify machine is deleted
+	if err := r.Get(context.TODO(), key, machine); !errors.IsNotFound(err) {
+		return fmt.Errorf(failedToDeleteMachineError, nodeName)
+	}
+	return nil
 }
 
 func isMachineBelongToMasterNode(machine *unstructured.Unstructured) bool {
@@ -120,17 +140,6 @@ func (r *MachineDeletionReconciler) getRemediation(ctx context.Context, req ctrl
 	return remediation
 }
 
-func (r *MachineDeletionReconciler) deleteMachine(ctx context.Context, machine *unstructured.Unstructured) error {
-	if err := r.Client.Delete(ctx, machine); err != nil {
-		if !errors.IsNotFound(err) {
-			r.Log.Error(err, "error deleting machine %s in namespace %s: %v", machine.GetName(), machine.GetNamespace())
-			return err
-		}
-		r.Log.Info("machine: %s in namespace: %s is deleted , but remediation still exist", machine.GetName(), machine.GetNamespace())
-	}
-	return nil
-}
-
 func (r *MachineDeletionReconciler) getNodeFromMdr(mdr *v1alpha1.MachineDeletion) (*v1.Node, error) {
 	node := &v1.Node{}
 	key := client.ObjectKey{
@@ -147,13 +156,13 @@ func (r *MachineDeletionReconciler) buildMachineFromNode(node *v1.Node) (*unstru
 
 	var nodeAnnotations map[string]string
 	if nodeAnnotations = node.Annotations; nodeAnnotations == nil {
-		return nil, fmt.Errorf("failed to find machine annotation on node name: %s", node.Name)
+		return nil, fmt.Errorf(noAnnotationsError, node.Name)
 	}
 	var machineNameNamespace, machineName string
 
 	//OpenShift Machine
 	if machineNameNamespace = nodeAnnotations[machineAnnotationOpenshift]; len(machineNameNamespace) == 0 {
-		return nil, fmt.Errorf("failed to find openshift machine annotation on node name: %s", node.Name)
+		return nil, fmt.Errorf(noMachineAnnotationError, node.Name)
 	}
 
 	machineName, machineNamespace, err := extractNameAndNamespace(machineNameNamespace, node.Name)
@@ -180,5 +189,5 @@ func extractNameAndNamespace(nameNamespace string, nodeName string) (string, str
 	if nameNamespaceSlice := strings.Split(nameNamespace, "/"); len(nameNamespaceSlice) == 2 {
 		return nameNamespaceSlice[1], nameNamespaceSlice[0], nil
 	}
-	return "", "", fmt.Errorf("failed to extract Machine Name and Machine Namespace from machine annotation on the node for node name: %s", nodeName)
+	return "", "", fmt.Errorf(invalidValueMachineAnnotationError, nodeName)
 }

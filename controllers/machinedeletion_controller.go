@@ -31,6 +31,8 @@ import (
 
 const (
 	machineKind = "Machine"
+	envVarApiServer3 = "xxx"
+	envVarApiServer2 = "yyy"
 )
 
 // MachineDeletionReconciler reconciles a MachineDeletion object
@@ -76,7 +78,6 @@ func (r *MachineDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	return ctrl.Result{}, nil
 }
 
-// SetupWithManager sets up the controller with the Manager.
 func (r *MachineDeletionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.MachineDeletion{}).

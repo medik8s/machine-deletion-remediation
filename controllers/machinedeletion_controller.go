@@ -78,13 +78,16 @@ func (r *MachineDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	//Health check was done by NHC
 	if node, err := r.getNodeFromMdr(remediation); err == nil {
 		if machine, err = r.buildMachineFromNode(node); err != nil {
+			r.Log.Error(err, "failed to fetch machine of node", "node name", node.Name)
 			return ctrl.Result{}, err
 		}
-		if isMachineBelongToMasterNode(machine) {
+		if !hasControllerOwner(machine) {
+			r.Log.Info("ignoring remediation of machine without controller associated to node", "node name", remediation.Name)
 			return ctrl.Result{}, nil
 		}
 
-	} else { //Failed both in fetching the machine and in fetching the node
+	} else { //Failed fetching the node
+		r.Log.Error(err, "failed to fetch node", "node name", remediation.Name)
 		return ctrl.Result{}, err
 	}
 
@@ -97,7 +100,10 @@ func (r *MachineDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 func (r *MachineDeletionReconciler) deleteMachineOfNode(ctx context.Context, machine *unstructured.Unstructured, nodeName string) error {
 	//delete the machine
-	_ = r.Client.Delete(ctx, machine)
+	if err := r.Client.Delete(ctx, machine); err != nil {
+		r.Log.Error(err, "failed to delete machine associated to node", "node name", nodeName)
+		return err
+	}
 
 	key := client.ObjectKey{
 		Name:      machine.GetName(),
@@ -111,14 +117,14 @@ func (r *MachineDeletionReconciler) deleteMachineOfNode(ctx context.Context, mac
 	return nil
 }
 
-func isMachineBelongToMasterNode(machine *unstructured.Unstructured) bool {
+func hasControllerOwner(machine *unstructured.Unstructured) bool {
 	refs := machine.GetOwnerReferences()
-	for _, ref := range refs {
-		if ref.Kind == machineSetKind {
-			return false
+	for i := range refs {
+		if refs[i].Controller != nil && *refs[i].Controller {
+			return true
 		}
 	}
-	return true
+	return false
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -133,7 +139,7 @@ func (r *MachineDeletionReconciler) getRemediation(ctx context.Context, req ctrl
 	key := client.ObjectKey{Name: req.Name, Namespace: req.Namespace}
 	if err := r.Client.Get(ctx, key, remediation); err != nil {
 		if !errors.IsNotFound(err) {
-			r.Log.Error(err, "error retrieving remediation %s in namespace %s: %v", req.Name, req.Namespace)
+			r.Log.Error(err, "error retrieving remediation in namespace", "remediation name", req.Name, "namespace", req.Namespace)
 		}
 		return nil
 	}
@@ -146,7 +152,7 @@ func (r *MachineDeletionReconciler) getNodeFromMdr(mdr *v1alpha1.MachineDeletion
 		Name: mdr.Name,
 	}
 
-	if err := r.Get(context.TODO(), key, node); err != nil {
+	if err := r.Get(context.Background(), key, node); err != nil {
 		return nil, err
 	}
 	return node, nil

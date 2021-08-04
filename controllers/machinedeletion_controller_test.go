@@ -14,7 +14,6 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -213,31 +212,6 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 				})
 			})
 
-			When("machine associated to worker node can't be deleted", func() {
-				var preventDeletionFinalizerName = "finalizer-preventing-worker-node-machine-deletion"
-				It("failed to delete machine error", func() {
-					verifyMachineNotDeleted(workerNodeMachineName)
-					Eventually(func() bool {
-						_, reconcileError = reconciler.Reconcile(context.Background(), reconcileRequest)
-						return reconcileError != nil && reconcileError.Error() == fmt.Sprintf(failedToDeleteMachineError, underTest.Name)
-					}).Should(BeTrue())
-				})
-
-				BeforeEach(func() {
-					controllerutil.AddFinalizer(workerNodeMachine, preventDeletionFinalizerName)
-					Expect(k8sClient.Update(context.Background(), workerNodeMachine)).ToNot(HaveOccurred())
-					underTest = createRemediation(workerNode)
-				})
-				AfterEach(func() {
-					updatedWorkerNodeMachine := createWorkerMachine(workerNodeMachineName)
-					Expect(k8sClient.Get(context.Background(), client.ObjectKey{Namespace: workerNodeMachine.Namespace, Name: workerNodeMachine.Name}, updatedWorkerNodeMachine)).ToNot(HaveOccurred())
-					controllerutil.RemoveFinalizer(updatedWorkerNodeMachine, preventDeletionFinalizerName)
-					Expect(k8sClient.Update(context.Background(), updatedWorkerNodeMachine)).ToNot(HaveOccurred())
-					isDeleteWorkerNodeMachine = false //will be deleted by test since the finalizer is removed
-
-				})
-
-			})
 			When("machine associated to worker node fails deletion", func() {
 				It("returns the same delete failure error", func() {
 					Eventually(func() bool {

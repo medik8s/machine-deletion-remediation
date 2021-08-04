@@ -112,7 +112,7 @@ func (r *MachineDeletionReconciler) deleteMachineOfNode(ctx context.Context, mac
 
 	//verify machine is deleted
 	if err := r.Get(context.TODO(), key, machine); !errors.IsNotFound(err) {
-		return fmt.Errorf(failedToDeleteMachineError, nodeName)
+		r.Log.Info("machine associated to node was not deleted probably due to a finalizer on the machine, note that the remediation is pending", "node name", nodeName)
 	}
 	return nil
 }

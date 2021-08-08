@@ -17,6 +17,7 @@ limitations under the License.
 package controllers
 
 import (
+	"github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	"os"
 	"path/filepath"
 	"testing"
@@ -111,6 +112,7 @@ var _ = BeforeSuite(func() {
 
 	k8sClient = k8sManager.GetClient()
 	Expect(k8sClient).ToNot(BeNil())
+	v1beta1.AddToScheme(k8sClient.Scheme())
 
 }, 60)
 

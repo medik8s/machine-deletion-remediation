@@ -214,7 +214,9 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 			When("machine associated to worker node fails deletion", func() {
 				It("returns the same delete failure error", func() {
+
 					Eventually(func() bool {
+						_ = k8sClient.Create(context.Background(), workerNodeMachine) //make sure worker machine will exist - it may be deleted by first run
 						_, reconcileError = reconciler.Reconcile(context.Background(), reconcileRequest)
 						return reconcileError != nil && reconcileError.Error() == mockDeleteFailMessage
 					}).Should(BeTrue())

@@ -83,7 +83,7 @@ func (r *MachineDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			return ctrl.Result{}, err
 		}
 		if !hasControllerOwner(machine) {
-			r.Log.Info("ignoring remediation of machine without controller associated to node", "node name", remediation.Name)
+			r.Log.Info("ignoring remediation of machine associated to node, since the machine has no controller owner", "node name", remediation.Name)
 			return ctrl.Result{}, nil
 		}
 

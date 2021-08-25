@@ -25,7 +25,7 @@ jobs:
       run: make test
 
     - name: Run codacy-coverage-reporter
-      run: bash <(curl -Ls https://coverage.codacy.com/get.sh) report --project-token ${{ secrets.CODACY_PROJECT_TOKEN }}  --language go --force-coverage-parser go -r cover.out
+      run: bash <(curl -Ls https://coverage.codacy.com/get.sh) report --project-token ${{ secrets.CODACY_PROJECT_TOKEN }}  --language go --force-coverage-parser go --commit-uuid "$GITHUB_SHA" -r cover.out
 
     - name: TestMutations
       run: make test-mutation-ci

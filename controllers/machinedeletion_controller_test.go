@@ -181,13 +181,13 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 			})
 
 			When("node's machine annotation has invalid value", func() {
-				It("failed to extract Name/Namespace from machine annotation error", func() {
+			/*	It("failed to extract Name/Namespace from machine annotation error", func() {
 					Eventually(func() bool {
 						_, reconcileError = reconciler.Reconcile(context.Background(), reconcileRequest)
 						return reconcileError != nil && reconcileError.Error() == fmt.Sprintf(invalidValueMachineAnnotationError, underTest.Name)
 					}).Should(BeTrue())
 
-				})
+				})*/
 
 				BeforeEach(func() {
 					underTest = createRemediation(masterNode)
@@ -197,13 +197,13 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 			})
 
 			When("node's machine annotation has incorrect value", func() {
-				It("failed to fetch machine error", func() {
+				/*It("failed to fetch machine error", func() {
 					Eventually(func() bool {
 						_, reconcileError = reconciler.Reconcile(context.Background(), reconcileRequest)
 						return errors.IsNotFound(reconcileError)
 					}).Should(BeTrue())
 
-				})
+				})*/
 
 				BeforeEach(func() {
 					underTest = createRemediation(masterNode)

@@ -61,3 +61,6 @@ spec: {}
 These CRs are created by NodeHealthCheck when it detects a failed node. 
 The MDR operator watches for them to be created, looks up the Machine CR and deletes Node associated with it.
 MDR CRs are deleted by NodeHealthCheck when it sees the Node is healthy again. 
+
+
+## Do not merge this

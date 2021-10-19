@@ -86,7 +86,6 @@ func (r *MachineDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			r.Log.Info("ignoring remediation of machine associated to node, since the machine has no controller owner", "node name", remediation.Name)
 			return ctrl.Result{}, nil
 		}
-
 	} else { //Failed fetching the node
 		r.Log.Error(err, "failed to fetch node", "node name", remediation.Name)
 		return ctrl.Result{}, err

@@ -1,6 +1,10 @@
 # Machine-API Driven Remediation
 
-This operator conforms to the External Remediation of [NodeHealthCheck](https://github.com/medik8s/node-healthcheck-operator#readme) and is designed to work with [Node Health Check]((https://github.com/medik8s/node-healthcheck-operator#readme)) to reprovision unhealthy nodes using the [Machine API](https://github.com/openshift/machine-api-operator#readme). It functions by following the annotation on the Node to the associated Machine object, confirms that it has an owning controller (e.g. MachineSetController), and deletes it.  Once the Machine CR has been deleted, the owning controller creates a replacement. 
+This operator conforms to the External Remediation of [NodeHealthCheck](https://github.com/medik8s/node-healthcheck-operator#readme)
+and is designed to work with [Node Health Check]((https://github.com/medik8s/node-healthcheck-operator#readme)) to reprovision unhealthy
+nodes using the [Machine API](https://github.com/openshift/machine-api-operator#readme). It functions by following the annotation on
+the Node to the associated Machine object, confirms that it has an owning controller (e.g. MachineSetController), and deletes it.
+Once the Machine CR has been deleted, the owning controller creates a replacement. 
 
 ## Pre-requisites
 * Machine API based cluster that is able to programmatically destroy and create cluster nodes
@@ -18,10 +22,10 @@ In order to set up: make sure that Node Health Check is running, Machine-deletio
 ## Example CRs
 An example MDR template object.
 ```yaml
-   apiVersion: machine.remediation.medik8s.io/v1alpha1
-   kind: MachineDeletionRemediationTemplate
+   apiVersion: machine-deletion.medik8s.io/v1alpha1
+   kind: MachineDeletionTemplate
    metadata:
-     name: group-x
+     name: my-name
      namespace: default
    spec:
      template:
@@ -37,9 +41,9 @@ metadata:
   name: nodehealthcheck-sample
 spec:
   remediationTemplate:
-    kind: MachineDeletionRemediationTemplate
-    apiVersion: machine.remediation.medik8s.io/v1alpha1
-    name: group-x
+    apiVersion: machine-deletion.medik8s.io/v1alpha1
+    kind: MachineDeletionTemplate
+    name: my-name
     namespace: default
 ```
 While the admin may define many NodeHealthCheck domains, they can all use the same MDR template if desired.
@@ -47,8 +51,8 @@ While the admin may define many NodeHealthCheck domains, they can all use the sa
 
 An example remediation request for Node `worker-0-21`.
 ```yaml
-apiVersion: machine.remediation.medik8s.io/v1alpha1
-kind: MachineDeletionRemediation
+apiVersion: machine-deletion.medik8s.io/v1alpha1
+kind: MachineDeletion
 metadata:
   name: worker-0-21
   namespace: default

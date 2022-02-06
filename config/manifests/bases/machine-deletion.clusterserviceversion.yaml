@@ -10,8 +10,7 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - description: MachineDeletion is the Schema for the machinedeletions
-        API
+    - description: MachineDeletion is the Schema for the machinedeletions API
       displayName: Machine Deletion
       kind: MachineDeletion
       name: machinedeletions.machine-deletion.medik8s.io
@@ -33,7 +32,7 @@ spec:
     strategy: ""
   installModes:
   - supported: false
-    type: OwnNamespacell
+    type: OwnNamespace
   - supported: false
     type: SingleNamespace
   - supported: false

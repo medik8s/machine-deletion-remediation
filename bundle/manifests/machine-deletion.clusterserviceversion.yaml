@@ -2,15 +2,51 @@ apiVersion: operators.coreos.com/v1alpha1
 kind: ClusterServiceVersion
 metadata:
   annotations:
-    alm-examples: '[]'
+    alm-examples: |-
+      [
+        {
+          "apiVersion": "machine-deletion.medik8s.io/v1alpha1",
+          "kind": "MachineDeletion",
+          "metadata": {
+            "name": "machinedeletion-sample"
+          },
+          "spec": {
+            "foo": "bar"
+          }
+        },
+        {
+          "apiVersion": "machine-deletion.medik8s.io/v1alpha1",
+          "kind": "MachineDeletionTemplate",
+          "metadata": {
+            "name": "machinedeletiontemplate-sample"
+          },
+          "spec": {
+            "template": {
+              "spec": {}
+            }
+          }
+        }
+      ]
     capabilities: Basic Install
-    operators.operatorframework.io/builder: operator-sdk-v1.7.1+git
+    operators.operatorframework.io/builder: operator-sdk-v1.11.0+git
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: machine-deletion.v0.0.1
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
-  customresourcedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: MachineDeletion is the Schema for the machinedeletions API
+      displayName: Machine Deletion
+      kind: MachineDeletion
+      name: machinedeletions.machine-deletion.medik8s.io
+      version: v1alpha1
+    - description: MachineDeletionTemplate is the Schema for the machinedeletiontemplates
+        API
+      displayName: Machine Deletion Template
+      kind: MachineDeletionTemplate
+      name: machinedeletiontemplates.machine-deletion.medik8s.io
+      version: v1alpha1
   description: machine-deletion operator
   displayName: machine-deletion
   icon:
@@ -18,7 +54,159 @@ spec:
     mediatype: ""
   install:
     spec:
-      deployments: []
+      clusterPermissions:
+      - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - nodes
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - machine-deletion.medik8s.io
+          resources:
+          - machinedeletions
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - machine-deletion.medik8s.io
+          resources:
+          - machinedeletions/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - machine-deletion.medik8s.io
+          resources:
+          - machinedeletions/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - machine.openshift.io
+          resources:
+          - machines
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - authentication.k8s.io
+          resources:
+          - tokenreviews
+          verbs:
+          - create
+        - apiGroups:
+          - authorization.k8s.io
+          resources:
+          - subjectaccessreviews
+          verbs:
+          - create
+        serviceAccountName: machine-deletion-controller-manager
+      deployments:
+      - name: machine-deletion-controller-manager
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              control-plane: controller-manager
+          strategy: {}
+          template:
+            metadata:
+              labels:
+                control-plane: controller-manager
+            spec:
+              containers:
+              - args:
+                - --secure-listen-address=0.0.0.0:8443
+                - --upstream=http://127.0.0.1:8080/
+                - --logtostderr=true
+                - --v=10
+                image: gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
+                name: kube-rbac-proxy
+                ports:
+                - containerPort: 8443
+                  name: https
+                resources: {}
+              - args:
+                - --health-probe-bind-address=:8081
+                - --metrics-bind-address=127.0.0.1:8080
+                - --leader-elect
+                command:
+                - /manager
+                image: quay.io/medik8s/machine-deletion-operator:v0.0.1
+                livenessProbe:
+                  httpGet:
+                    path: /healthz
+                    port: 8081
+                  initialDelaySeconds: 15
+                  periodSeconds: 20
+                name: manager
+                readinessProbe:
+                  httpGet:
+                    path: /readyz
+                    port: 8081
+                  initialDelaySeconds: 5
+                  periodSeconds: 10
+                resources:
+                  limits:
+                    cpu: 100m
+                    memory: 30Mi
+                  requests:
+                    cpu: 100m
+                    memory: 20Mi
+                securityContext:
+                  allowPrivilegeEscalation: false
+              securityContext:
+                runAsNonRoot: true
+              serviceAccountName: machine-deletion-controller-manager
+              terminationGracePeriodSeconds: 10
+      permissions:
+      - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - configmaps
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - coordination.k8s.io
+          resources:
+          - leases
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - ""
+          resources:
+          - events
+          verbs:
+          - create
+          - patch
+        serviceAccountName: machine-deletion-controller-manager
     strategy: deployment
   installModes:
   - supported: false

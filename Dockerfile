@@ -2,10 +2,10 @@
 FROM quay.io/centos/centos:stream8 AS builder
 RUN dnf install git golang -y
 
-# Ensure go 1.15
-RUN go install golang.org/dl/go1.15@latest
-RUN ~/go/bin/go1.15 download
-RUN /bin/cp -f ~/go/bin/go1.15 /usr/bin/go
+# Ensure go 1.19
+RUN go install golang.org/dl/go1.19@latest
+RUN ~/go/bin/go1.19 download
+RUN /bin/cp -f ~/go/bin/go1.19 /usr/bin/go
 RUN go version
 
 WORKDIR /workspace

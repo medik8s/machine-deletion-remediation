@@ -19,7 +19,7 @@ In order to set up: make sure that Node Health Check is running, Machine-deletio
 An example MDR template object.
 ```yaml
    apiVersion: machine.remediation.medik8s.io/v1alpha1
-   kind: MachineDeletionRemediationTemplate
+   kind: MachineDeletionTemplate
    metadata:
      name: group-x
      namespace: default
@@ -37,7 +37,7 @@ metadata:
   name: nodehealthcheck-sample
 spec:
   remediationTemplate:
-    kind: MachineDeletionRemediationTemplate
+    kind: MachineDeletionTemplate
     apiVersion: machine.remediation.medik8s.io/v1alpha1
     name: group-x
     namespace: default
@@ -45,10 +45,10 @@ spec:
 While the admin may define many NodeHealthCheck domains, they can all use the same MDR template if desired.
 
 
-An example remediation request for Node `worker-0-21`.
+An example remediation request for Node `worker-0-21` (NOTE: *uid* is the nodehealthcheck-sample's UID).
 ```yaml
 apiVersion: machine.remediation.medik8s.io/v1alpha1
-kind: MachineDeletionRemediation
+kind: MachineDeletion
 metadata:
   name: worker-0-21
   namespace: default
@@ -56,6 +56,7 @@ metadata:
     - kind: NodeHealthCheck
       apiVersion: remediation.medik8s.io/v1alpha1
       name: nodehealthcheck-sample
+      uid: 754189c9-b0d2-4894-bb2c-6adbdccb26f8
 spec: {}
 ```
 These CRs are created by NodeHealthCheck when it detects a failed node. 

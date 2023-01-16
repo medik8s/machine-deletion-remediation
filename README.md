@@ -6,10 +6,10 @@ This operator conforms to the External Remediation of [NodeHealthCheck](https://
 * Machine API based cluster that is able to programmatically destroy and create cluster nodes
 * Nodes are associated with Machines
 * Machines are declaratively managed
-* Node Healthheck is installed and running 
+* Node Health Check is installed and running 
 
 ## Installation
-- Deploy MDR (Machine-deletion-remediation) to a container in the cluster pod.  Try `make deploy`, official images comming soon.
+- Deploy MDR (Machine-deletion-remediation) to a container in the cluster pod. Try `make deploy`, official images coming soon.
 - Load the yaml manifest of the MDR template (see below).
 - Modifying NodeHealthCheck CR to use MDR as it's remediator.
 This is basically a specific use case of an External Remediation of [NodeHealthCheck](https://github.com/medik8s/node-healthcheck-operator#readme).

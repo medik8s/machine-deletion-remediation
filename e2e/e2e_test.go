@@ -19,7 +19,7 @@ import (
 const (
 	machineDeletionNamespace   = "openshift-operators"
 	machineAnnotationOpenshift = "machine.openshift.io/machine"
-	machineApiVersion          = "machine.openshift.io/v1beta1"
+	machineAPIVersion          = "machine.openshift.io/v1beta1"
 	machineKind                = "Machine"
 	workerLabelName            = "node-role.kubernetes.io/worker"
 )
@@ -72,7 +72,7 @@ var _ = Describe("E2E tests", func() {
 func getMachine() *unstructured.Unstructured {
 	machine := new(unstructured.Unstructured)
 	machine.SetKind(machineKind)
-	machine.SetAPIVersion(machineApiVersion)
+	machine.SetAPIVersion(machineAPIVersion)
 	return machine
 
 }

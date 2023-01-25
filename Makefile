@@ -123,6 +123,12 @@ test-mutation: verify-no-changes fetch-mutation ## Run mutation tests in manual 
 test-mutation-ci: fetch-mutation ## Run mutation tests as part of auto build process.
 	./hack/test-mutation.sh
 
+# Run end to end tests
+.PHONY: test-e2e
+test-e2e:
+	@test -n "${KUBECONFIG}" -o -r ${HOME}/.kube/config || (echo "Failed to find kubeconfig in ~/.kube/config or no KUBECONFIG set"; exit 1)
+	go test ./e2e -coverprofile cover.out -v -timeout 10m -ginkgo.vv
+
 # Build manager binary
 manager: generate fmt vet
 	go build -o bin/manager main.go

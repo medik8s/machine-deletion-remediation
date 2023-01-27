@@ -126,6 +126,7 @@ test-mutation-ci: fetch-mutation ## Run mutation tests as part of auto build pro
 # Run end to end tests
 .PHONY: test-e2e
 test-e2e:
+	# KUBECONFIG must be set to the cluster, and MDR needs to be deployed already
 	@test -n "${KUBECONFIG}" -o -r ${HOME}/.kube/config || (echo "Failed to find kubeconfig in ~/.kube/config or no KUBECONFIG set"; exit 1)
 	go test ./e2e -coverprofile cover.out -v -timeout 10m -ginkgo.vv
 

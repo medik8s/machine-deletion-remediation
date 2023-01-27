@@ -52,11 +52,31 @@ var _ = Describe("E2E tests", func() {
 		})
 
 		Describe("CR created for an unhealthy node", func() {
-			It("deletes the associated Machine", func() {
-				remediationCreationTime := time.Now()
+			It("recreates the associated Machine", func() {
 				mdr = createRemediation(node)
-				verifyMachineIsDeleted(machine)
-				verifyMachineIsRecreated(node, remediationCreationTime)
+
+				By("checking the Machine was deleted")
+				Eventually(func() bool {
+					key := client.ObjectKeyFromObject(machine)
+					err := k8sClient.Get(context.TODO(), key, getMachine())
+					return errors.IsNotFound(err)
+				}, 5*time.Minute, 10*time.Second).Should(BeTrue())
+
+				By("checking the Node is recreated")
+				newNode := &v1.Node{}
+				Eventually(func() types.UID {
+					key := client.ObjectKeyFromObject(node)
+					if err := k8sClient.Get(context.TODO(), key, newNode); err != nil {
+						return node.GetUID()
+					}
+					newUID := newNode.GetUID()
+					return newUID
+				}, 15*time.Minute, 10*time.Second).ShouldNot(Equal(node.GetUID()))
+
+				By("checking associated Machine was created after the remediation")
+				newMachine := getAssociatedMachine(newNode)
+				Expect(newMachine.GetUID()).ShouldNot(Equal(machine.GetUID()))
+				Expect(newMachine.GetCreationTimestamp().Time).Should(BeTemporally(">=", mdr.GetCreationTimestamp().Time))
 			})
 		})
 	})
@@ -112,43 +132,4 @@ func deleteRemediation(mdr *v1alpha1.MachineDeletion) {
 		}
 		return false
 	}, timeout, pollInterval).Should(BeTrue(), "mdr not deleted in time")
-}
-
-func verifyMachineIsDeleted(machine *unstructured.Unstructured) {
-	By("checking the machine is deleted")
-	timeout := 5 * time.Minute
-	pollInterval := 10 * time.Second
-
-	key := client.ObjectKey{
-		Name:      machine.GetName(),
-		Namespace: machine.GetNamespace(),
-	}
-
-	log.Info("Machine deletion check", "timeout", timeout)
-	EventuallyWithOffset(1, func() bool {
-		err := k8sClient.Get(context.TODO(), key, getMachine())
-		return errors.IsNotFound(err)
-	}, timeout, pollInterval).Should(BeTrue())
-}
-
-func verifyMachineIsRecreated(node *v1.Node, remediationCreationTime time.Time) {
-	By("checking the associated Node is first recreated")
-	timeout := 15 * time.Minute
-	pollInterval := 10 * time.Second
-
-	log.Info("Node reboot check", "timeout", timeout)
-	oldNodeUID := node.GetUID()
-	newNode := &v1.Node{}
-	EventuallyWithOffset(1, func() types.UID {
-		key := client.ObjectKeyFromObject(node)
-		if err := k8sClient.Get(context.TODO(), key, newNode); err != nil {
-			return node.GetUID()
-		}
-		newUID := newNode.GetUID()
-		return newUID
-	}, timeout, pollInterval).ShouldNot(Equal(oldNodeUID))
-
-	By("checking associated Machine was created after the remediation")
-	newMachine := getAssociatedMachine(newNode)
-	Expect(newMachine.GetCreationTimestamp().Time).Should(BeTemporally(">", remediationCreationTime))
 }

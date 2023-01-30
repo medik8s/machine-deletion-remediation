@@ -27,38 +27,40 @@ const (
 
 var _ = Describe("E2E tests", func() {
 	Context("Machine Deletion Remediation", func() {
-		var (
-			node    *v1.Node
-			mdr     *v1alpha1.MachineDeletion
-			machine *unstructured.Unstructured
-		)
-		BeforeEach(func() {
-			// Get the first Worker node available
-			req, _ := labels.NewRequirement(workerLabelName, selection.Exists, []string{})
-
-			selector := labels.NewSelector().Add(*req)
-
-			workers := &v1.NodeList{}
-			Expect(k8sClient.List(context.Background(), workers, &client.ListOptions{LabelSelector: selector})).ToNot(HaveOccurred())
-			Expect(len(workers.Items)).To(BeNumerically(">=", 2))
-			node = &workers.Items[0]
-			machine = getAssociatedMachine(node)
-		})
-
-		AfterEach(func() {
-			if mdr != nil {
-				deleteRemediation(mdr)
-			}
-		})
-
 		Describe("CR created for an unhealthy node", func() {
-			It("recreates the associated Machine", func() {
-				mdr = createRemediation(node)
+			var (
+				node    *v1.Node
+				mdr     *v1alpha1.MachineDeletion
+				machine *unstructured.Unstructured
+			)
+			BeforeEach(func() {
+				// Get the first Worker node available
+				req, _ := labels.NewRequirement(workerLabelName, selection.Exists, []string{})
 
+				selector := labels.NewSelector().Add(*req)
+
+				workers := &v1.NodeList{}
+				Expect(k8sClient.List(context.Background(), workers, &client.ListOptions{LabelSelector: selector})).ToNot(HaveOccurred())
+				Expect(len(workers.Items)).To(BeNumerically(">=", 2))
+				node = &workers.Items[0]
+				machine = getAssociatedMachine(node)
+			})
+
+			JustBeforeEach(func() {
+				mdr = createRemediation(node)
+			})
+
+			AfterEach(func() {
+				if mdr != nil {
+					deleteRemediation(mdr)
+				}
+			})
+
+			It("recreates the associated Machine", func() {
 				By("checking the Machine was deleted")
 				Eventually(func() bool {
 					key := client.ObjectKeyFromObject(machine)
-					err := k8sClient.Get(context.TODO(), key, getMachine())
+					err := k8sClient.Get(context.TODO(), key, createMachineStruct())
 					return errors.IsNotFound(err)
 				}, 5*time.Minute, 10*time.Second).Should(BeTrue())
 

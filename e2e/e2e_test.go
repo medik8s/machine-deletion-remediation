@@ -84,7 +84,7 @@ var _ = Describe("E2E tests", func() {
 	})
 })
 
-func getMachine() *unstructured.Unstructured {
+func createMachineStruct() *unstructured.Unstructured {
 	machine := new(unstructured.Unstructured)
 	machine.SetKind(machineKind)
 	machine.SetAPIVersion(machineAPIVersion)
@@ -100,7 +100,7 @@ func getAssociatedMachine(node *v1.Node) *unstructured.Unstructured {
 		Namespace: machineNamespace,
 	}
 
-	machine := getMachine()
+	machine := createMachineStruct()
 	Expect(k8sClient.Get(context.TODO(), key, machine)).To(Succeed())
 	return machine
 }

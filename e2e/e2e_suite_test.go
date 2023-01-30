@@ -4,20 +4,22 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/go-logr/logr"
-	"github.com/medik8s/machine-deletion/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/go-logr/logr"
 	"go.uber.org/zap/zapcore"
+
 	"k8s.io/api/apps/v1beta1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
+	"github.com/medik8s/machine-deletion/api/v1alpha1"
 )
 
 var (

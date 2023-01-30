@@ -66,11 +66,4 @@ var _ = BeforeSuite(func() {
 
 	k8sClient, err = ctrl.New(config, ctrl.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
-
-	debug()
 })
-
-func debug() {
-	version, _ := clientSet.ServerVersion()
-	fmt.Fprint(GinkgoWriter, version)
-}

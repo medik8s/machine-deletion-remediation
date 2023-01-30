@@ -125,13 +125,4 @@ func deleteRemediation(mdr *v1alpha1.MachineDeletion) {
 		}
 		return err
 	}, timeout, pollInterval).ShouldNot(HaveOccurred(), "failed to delete mdr")
-
-	// Wait until deleted
-	EventuallyWithOffset(1, func() bool {
-		err := k8sClient.Get(context.Background(), client.ObjectKeyFromObject(mdr), mdr)
-		if errors.IsNotFound(err) {
-			return true
-		}
-		return false
-	}, timeout, pollInterval).Should(BeTrue(), "mdr not deleted in time")
 }

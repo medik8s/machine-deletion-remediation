@@ -11,6 +11,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
@@ -96,8 +97,9 @@ func createMachineStruct() *unstructured.Unstructured {
 }
 
 func getAssociatedMachine(node *v1.Node) *unstructured.Unstructured {
-	machineNamespace := strings.Split(node.GetAnnotations()[machineAnnotationOpenshift], "/")[0]
-	machineName := strings.Split(node.GetAnnotations()[machineAnnotationOpenshift], "/")[1]
+	parts := strings.Split(node.GetAnnotations()[machineAnnotationOpenshift], "/")
+	machineNamespace := parts[0]
+	machineName := parts[1]
 	key := client.ObjectKey{
 		Name:      machineName,
 		Namespace: machineNamespace,
@@ -109,9 +111,12 @@ func getAssociatedMachine(node *v1.Node) *unstructured.Unstructured {
 }
 
 func createRemediation(node *v1.Node) *v1alpha1.MachineDeletion {
-	mdr := &v1alpha1.MachineDeletion{}
-	mdr.Name = node.Name
-	mdr.Namespace = machineDeletionNamespace
+	mdr := &v1alpha1.MachineDeletion{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      node.Name,
+			Namespace: machineDeletionNamespace,
+		},
+	}
 
 	ExpectWithOffset(1, k8sClient.Create(context.Background(), mdr)).ToNot(HaveOccurred())
 	return mdr

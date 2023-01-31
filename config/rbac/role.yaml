@@ -14,9 +14,9 @@ rules:
   - list
   - watch
 - apiGroups:
-  - machine-deletion.medik8s.io
+  - machine-deletion-remediation.medik8s.io
   resources:
-  - machinedeletions
+  - machinedeletionremediations
   verbs:
   - create
   - delete
@@ -26,15 +26,15 @@ rules:
   - update
   - watch
 - apiGroups:
-  - machine-deletion.medik8s.io
+  - machine-deletion-remediation.medik8s.io
   resources:
-  - machinedeletions/finalizers
+  - machinedeletionremediations/finalizers
   verbs:
   - update
 - apiGroups:
-  - machine-deletion.medik8s.io
+  - machine-deletion-remediation.medik8s.io
   resources:
-  - machinedeletions/status
+  - machinedeletionremediations/status
   verbs:
   - get
   - patch

@@ -1,7 +1,6 @@
-apiVersion: machine-deletion.medik8s.io/v1alpha1
-kind: MachineDeletionTemplate
+apiVersion: machine-deletion-remediation.medik8s.io/v1alpha1
+kind: MachineDeletionRemediationTemplate
 metadata:
-  name: machinedeletiontemplate-sample
+  name: machinedeletionremediationtemplate-sample
 spec:
-  template:
-    spec: {}
+  # TODO(user): Add fields here

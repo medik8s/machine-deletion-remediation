@@ -1,13 +1,13 @@
-# permissions for end users to edit machinedeletions.
+# permissions for end users to edit machinedeletionremediations.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: machinedeletion-editor-role
+  name: machinedeletionremediation-editor-role
 rules:
 - apiGroups:
-  - machine-deletion.medik8s.io
+  - machine-deletion-remediation.medik8s.io
   resources:
-  - machinedeletions
+  - machinedeletionremediations
   verbs:
   - create
   - delete
@@ -17,8 +17,8 @@ rules:
   - update
   - watch
 - apiGroups:
-  - machine-deletion.medik8s.io
+  - machine-deletion-remediation.medik8s.io
   resources:
-  - machinedeletions/status
+  - machinedeletionremediations/status
   verbs:
   - get

@@ -4,26 +4,26 @@ metadata:
   annotations:
     alm-examples: '[]'
     capabilities: Basic Install
-  name: machine-deletion.v0.0.0
+  name: machine-deletion-remediation.v0.0.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - description: MachineDeletion is the Schema for the machinedeletions
+    - description: MachineDeletionRemediation is the Schema for the machinedeletionremediations
         API
-      displayName: Machine Deletion
-      kind: MachineDeletion
-      name: machinedeletions.machine-deletion.medik8s.io
+      displayName: Machine Deletion Remediation
+      kind: MachineDeletionRemediation
+      name: machinedeletionremediations.machine-deletion-remediation.medik8s.io
       version: v1alpha1
-    - description: MachineDeletionTemplate is the Schema for the machinedeletiontemplates
+    - description: MachineDeletionRemediationTemplate is the Schema for the machinedeletionremediationtemplates
         API
-      displayName: Machine Deletion Template
-      kind: MachineDeletionTemplate
-      name: machinedeletiontemplates.machine-deletion.medik8s.io
+      displayName: Machine Deletion Remediation Template
+      kind: MachineDeletionRemediationTemplate
+      name: machinedeletionremediationtemplates.machine-deletion-remediation.medik8s.io
       version: v1alpha1
-  description: machine-deletion operator
-  displayName: machine-deletion
+  description: machine-deletion-remediation operator
+  displayName: machine-deletion-remediation
   icon:
   - base64data: ""
     mediatype: ""
@@ -44,8 +44,8 @@ spec:
   - machine
   - deletion
   links:
-  - name: Machine Deletion
-    url: https://machine-deletion.domain
+  - name: Machine Deletion Remediation
+    url: https://machine-deletion-remediation.domain
   maintainers:
   - email: mshitrit@redhat.com
     name: Michael Shitrit

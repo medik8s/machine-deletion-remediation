@@ -19,6 +19,8 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/go-logr/logr"
 	"github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	v1 "k8s.io/api/core/v1"
@@ -27,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strings"
 
 	"github.com/medik8s/machine-deletion/api/v1alpha1"
 )
@@ -50,15 +51,15 @@ type MachineDeletionReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=machine-deletion.medik8s.io,resources=machinedeletions,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=machine-deletion.medik8s.io,resources=machinedeletions/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=machine-deletion.medik8s.io,resources=machinedeletions/finalizers,verbs=update
+//+kubebuilder:rbac:groups=machine-deletion-remediation.medik8s.io,resources=machinedeletionremediations,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=machine-deletion-remediation.medik8s.io,resources=machinedeletionremediations/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=machine-deletion-remediation.medik8s.io,resources=machinedeletionremediations/finalizers,verbs=update
 //+kubebuilder:rbac:groups=machine.openshift.io,resources=machines,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// the MachineDeletion object against the actual cluster state, and then
+// the MachineDeletionRemediation object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
 //

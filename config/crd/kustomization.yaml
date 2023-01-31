@@ -2,8 +2,8 @@
 # since it depends on service name and namespace that are out of this kustomize package.
 # It should be run by config/default
 resources:
-- bases/machine-deletion.medik8s.io_machinedeletions.yaml
-- bases/machine-deletion.medik8s.io_machinedeletiontemplates.yaml
+- bases/machine-deletion-remediation.medik8s.io_machinedeletionremediations.yaml
+- bases/machine-deletion-remediation.medik8s.io_machinedeletionremediationtemplates.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:

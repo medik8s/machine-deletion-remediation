@@ -3,10 +3,10 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"github.com/medik8s/machine-deletion/api/v1alpha1"
-	. "github.com/onsi/ginkgo"
+
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,6 +15,9 @@ import (
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"github.com/medik8s/machine-deletion/api/v1alpha1"
+	"github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 )
 
 const (

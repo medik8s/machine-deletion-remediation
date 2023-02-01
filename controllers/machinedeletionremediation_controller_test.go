@@ -30,7 +30,7 @@ const (
 
 var _ = Describe("Machine Deletion Remediation CR", func() {
 	var (
-		underTest                            *v1alpha1.MachineDeletion
+		underTest                            *v1alpha1.MachineDeletionRemediation
 		workerNodeMachine, masterNodeMachine *v1beta1.Machine
 		workerNode, masterNode               *v1.Node
 		//phantomNode is never created by client
@@ -39,7 +39,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 	Context("Defaults", func() {
 		BeforeEach(func() {
-			underTest = &v1alpha1.MachineDeletion{
+			underTest = &v1alpha1.MachineDeletionRemediation{
 				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: defaultNamespace},
 			}
 			err := k8sClient.Create(context.Background(), underTest)
@@ -134,7 +134,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 			var (
 				reconcileError   error
 				reconcileRequest reconcile.Request
-				reconciler       MachineDeletionReconciler
+				reconciler       MachineDeletionRemediationReconciler
 			)
 			When("remediation is not connected to a node", func() {
 				It("node not found error", func() {
@@ -227,13 +227,13 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 				BeforeEach(func() {
 					underTest = createRemediation(workerNode)
-					reconciler = MachineDeletionReconciler{Client: deleteFailClient{k8sClient}, Log: controllerruntime.Log, Scheme: scheme.Scheme}
+					reconciler = MachineDeletionRemediationReconciler{Client: deleteFailClient{k8sClient}, Log: controllerruntime.Log, Scheme: scheme.Scheme}
 					isDeleteWorkerNodeMachine = false //Reconcile runs twice, first time is initiated automatically by Ginkgo framework without fake client - the machine is deleted than
 				})
 			})
 
 			BeforeEach(func() {
-				reconciler = MachineDeletionReconciler{Client: k8sClient, Log: controllerruntime.Log, Scheme: scheme.Scheme}
+				reconciler = MachineDeletionRemediationReconciler{Client: k8sClient, Log: controllerruntime.Log, Scheme: scheme.Scheme}
 			})
 
 			JustBeforeEach(func() {
@@ -269,8 +269,8 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 	})
 })
 
-func createRemediation(node *v1.Node) *v1alpha1.MachineDeletion {
-	machineDeletion := &v1alpha1.MachineDeletion{}
+func createRemediation(node *v1.Node) *v1alpha1.MachineDeletionRemediation {
+	machineDeletion := &v1alpha1.MachineDeletionRemediation{}
 	machineDeletion.Name = node.Name
 	machineDeletion.Namespace = defaultNamespace
 	return machineDeletion

@@ -78,12 +78,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controllers.MachineDeletionReconciler{
+	if err = (&controllers.MachineDeletionRemediationReconciler{
 		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("MachineDeletion"),
+		Log:    ctrl.Log.WithName("controllers").WithName("MachineDeletionRemediation"),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "MachineDeletion")
+		setupLog.Error(err, "unable to create controller", "controller", "MachineDeletionRemediation")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

@@ -44,7 +44,7 @@ type MachineDeletionRemediationTemplateStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// MachineDeletionRemediationTemplate is the Schema for the machinedeletiontemplates API
+// MachineDeletionRemediationTemplate is the Schema for the machinedeletionremediationtemplates API
 type MachineDeletionRemediationTemplate struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

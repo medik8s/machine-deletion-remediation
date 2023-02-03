@@ -270,10 +270,10 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 })
 
 func createRemediation(node *v1.Node) *v1alpha1.MachineDeletionRemediation {
-	machineDeletion := &v1alpha1.MachineDeletionRemediation{}
-	machineDeletion.Name = node.Name
-	machineDeletion.Namespace = defaultNamespace
-	return machineDeletion
+	mdr := &v1alpha1.MachineDeletionRemediation{}
+	mdr.Name = node.Name
+	mdr.Namespace = defaultNamespace
+	return mdr
 }
 
 func createNodeWithMachine(nodeName string, machine *v1beta1.Machine) *v1.Node {

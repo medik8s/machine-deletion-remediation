@@ -22,11 +22,11 @@ import (
 )
 
 const (
-	machineDeletionNamespace   = "openshift-operators"
-	machineAnnotationOpenshift = "machine.openshift.io/machine"
-	machineAPIVersion          = "machine.openshift.io/v1beta1"
-	machineKind                = "Machine"
-	workerLabelName            = "node-role.kubernetes.io/worker"
+	machineDeletionRemediationNamespace = "openshift-operators"
+	machineAnnotationOpenshift          = "machine.openshift.io/machine"
+	machineAPIVersion                   = "machine.openshift.io/v1beta1"
+	machineKind                         = "Machine"
+	workerLabelName                     = "node-role.kubernetes.io/worker"
 )
 
 var _ = Describe("E2E tests", func() {
@@ -114,7 +114,7 @@ func createRemediation(node *v1.Node) *v1alpha1.MachineDeletionRemediation {
 	mdr := &v1alpha1.MachineDeletionRemediation{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      node.Name,
-			Namespace: machineDeletionNamespace,
+			Namespace: machineDeletionRemediationNamespace,
 		},
 	}
 

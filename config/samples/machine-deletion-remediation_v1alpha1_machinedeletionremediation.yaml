@@ -1,0 +1,6 @@
+apiVersion: machine-deletion-remediation.medik8s.io/v1alpha1
+kind: MachineDeletionRemediation
+metadata:
+  name: machinedeletionremediation-sample
+spec:
+  # TODO(user): Add fields here

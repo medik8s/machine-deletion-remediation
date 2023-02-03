@@ -6,13 +6,13 @@ metadata:
     capabilities: Basic Install
     operators.operatorframework.io/builder: operator-sdk-v1.7.1+git
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
-  name: machine-deletion.v0.0.1
+  name: machine-deletion-remediation.v0.0.1
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
   customresourcedefinitions: {}
-  description: machine-deletion operator
-  displayName: machine-deletion
+  description: machine-deletion-remediation operator
+  displayName: Machine Deletion Remediation
   icon:
   - base64data: ""
     mediatype: ""
@@ -33,8 +33,8 @@ spec:
   - machine
   - deletion
   links:
-  - name: Machine Deletion
-    url: https://machine-deletion.domain
+  - name: Machine Deletion Remediation
+    url: https://machine-deletion-remediation.domain
   maintainers:
   - email: mshitrit@redhat.com
     name: Michael Shitrit

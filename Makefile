@@ -1,7 +1,7 @@
 # SHELL defines bash so all the inline scripts here will work as expected.
 SHELL := /bin/bash
 
-OPERATOR_NAME := machine-deletion
+OPERATOR_NAME := machine-deletion-remediation
 
 # VERSION defines the project version for the bundle. 
 # Update this value when you upgrade the version of your project.
@@ -47,7 +47,7 @@ export IMAGE_TAG
 # This variable is used to construct full image tags for bundle and catalog images.
 #
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
-# medik8s/machine-deletion-bundle:$(IMAGE_TAG) and medik8s/machine-deletion-catalog:$(IMAGE_TAG).
+# medik8s/machine-deletion-remediation-bundle:$(IMAGE_TAG) and medik8s/machine-deletion-remediation-catalog:$(IMAGE_TAG).
 IMAGE_TAG_BASE ?= $(IMAGE_REGISTRY)/$(OPERATOR_NAME)
 
 # The image tag given to the resulting catalog image (e.g. make catalog-build CATALOG_IMG=example.com/operator-catalog:v0.2.0).

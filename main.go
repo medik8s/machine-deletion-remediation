@@ -31,8 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	appv1alpha1 "github.com/medik8s/machine-deletion/api/v1alpha1"
-	"github.com/medik8s/machine-deletion/controllers"
+	appv1alpha1 "github.com/medik8s/machine-deletion-remediation/api/v1alpha1"
+	"github.com/medik8s/machine-deletion-remediation/controllers"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -78,12 +78,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controllers.MachineDeletionReconciler{
+	if err = (&controllers.MachineDeletionRemediationReconciler{
 		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("MachineDeletion"),
+		Log:    ctrl.Log.WithName("controllers").WithName("MachineDeletionRemediation"),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "MachineDeletion")
+		setupLog.Error(err, "unable to create controller", "controller", "MachineDeletionRemediation")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

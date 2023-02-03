@@ -18,15 +18,15 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/medik8s/machine-deletion/api/v1alpha1"
+	"github.com/medik8s/machine-deletion-remediation/api/v1alpha1"
 )
 
 const (
-	machineDeletionNamespace   = "openshift-operators"
-	machineAnnotationOpenshift = "machine.openshift.io/machine"
-	machineAPIVersion          = "machine.openshift.io/v1beta1"
-	machineKind                = "Machine"
-	workerLabelName            = "node-role.kubernetes.io/worker"
+	machineDeletionRemediationNamespace = "openshift-operators"
+	machineAnnotationOpenshift          = "machine.openshift.io/machine"
+	machineAPIVersion                   = "machine.openshift.io/v1beta1"
+	machineKind                         = "Machine"
+	workerLabelName                     = "node-role.kubernetes.io/worker"
 )
 
 var _ = Describe("E2E tests", func() {
@@ -34,7 +34,7 @@ var _ = Describe("E2E tests", func() {
 		Describe("CR created for an unhealthy node", func() {
 			var (
 				node    *v1.Node
-				mdr     *v1alpha1.MachineDeletion
+				mdr     *v1alpha1.MachineDeletionRemediation
 				machine *unstructured.Unstructured
 			)
 			BeforeEach(func() {
@@ -110,11 +110,11 @@ func getAssociatedMachine(node *v1.Node) *unstructured.Unstructured {
 	return machine
 }
 
-func createRemediation(node *v1.Node) *v1alpha1.MachineDeletion {
-	mdr := &v1alpha1.MachineDeletion{
+func createRemediation(node *v1.Node) *v1alpha1.MachineDeletionRemediation {
+	mdr := &v1alpha1.MachineDeletionRemediation{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      node.Name,
-			Namespace: machineDeletionNamespace,
+			Namespace: machineDeletionRemediationNamespace,
 		},
 	}
 
@@ -122,7 +122,7 @@ func createRemediation(node *v1.Node) *v1alpha1.MachineDeletion {
 	return mdr
 }
 
-func deleteRemediation(mdr *v1alpha1.MachineDeletion) {
+func deleteRemediation(mdr *v1alpha1.MachineDeletionRemediation) {
 	timeout := 2 * time.Minute
 	pollInterval := 10 * time.Second
 	// Delete

@@ -19,6 +19,8 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/go-logr/logr"
 	"github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	v1 "k8s.io/api/core/v1"
@@ -27,9 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strings"
 
-	"github.com/medik8s/machine-deletion/api/v1alpha1"
+	"github.com/medik8s/machine-deletion-remediation/api/v1alpha1"
 )
 
 const (
@@ -43,34 +44,34 @@ const (
 	failedToDeleteMachineError         = "failed to delete machine of node name: %s"
 )
 
-// MachineDeletionReconciler reconciles a MachineDeletion object
-type MachineDeletionReconciler struct {
+// MachineDeletionRemediationReconciler reconciles a MachineDeletionRemediation object
+type MachineDeletionRemediationReconciler struct {
 	client.Client
 	Log    logr.Logger
 	Scheme *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=machine-deletion.medik8s.io,resources=machinedeletions,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=machine-deletion.medik8s.io,resources=machinedeletions/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=machine-deletion.medik8s.io,resources=machinedeletions/finalizers,verbs=update
+//+kubebuilder:rbac:groups=machine-deletion-remediation.medik8s.io,resources=machinedeletionremediations,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=machine-deletion-remediation.medik8s.io,resources=machinedeletionremediations/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=machine-deletion-remediation.medik8s.io,resources=machinedeletionremediations/finalizers,verbs=update
 //+kubebuilder:rbac:groups=machine.openshift.io,resources=machines,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// the MachineDeletion object against the actual cluster state, and then
+// the MachineDeletionRemediationRemediation object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.8.3/pkg/reconcile
-func (r *MachineDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("machinedeletion", req.NamespacedName)
+func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	log := r.Log.WithValues("machinedeletionremediation", req.NamespacedName)
 
 	log.Info("reconciling...")
 
 	//fetch the remediation
-	var remediation *v1alpha1.MachineDeletion
+	var remediation *v1alpha1.MachineDeletionRemediation
 	if remediation = r.getRemediation(ctx, req); remediation == nil {
 		return ctrl.Result{}, nil
 	}
@@ -99,7 +100,7 @@ func (r *MachineDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	return ctrl.Result{}, nil
 }
 
-func (r *MachineDeletionReconciler) deleteMachineOfNode(ctx context.Context, machine *unstructured.Unstructured, nodeName string) error {
+func (r *MachineDeletionRemediationReconciler) deleteMachineOfNode(ctx context.Context, machine *unstructured.Unstructured, nodeName string) error {
 	//delete the machine
 	if err := r.Client.Delete(ctx, machine); err != nil {
 		r.Log.Error(err, "failed to delete machine associated to node", "node name", nodeName)
@@ -129,14 +130,14 @@ func hasControllerOwner(machine *unstructured.Unstructured) bool {
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *MachineDeletionReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *MachineDeletionRemediationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&v1alpha1.MachineDeletion{}).
+		For(&v1alpha1.MachineDeletionRemediation{}).
 		Complete(r)
 }
 
-func (r *MachineDeletionReconciler) getRemediation(ctx context.Context, req ctrl.Request) *v1alpha1.MachineDeletion {
-	remediation := new(v1alpha1.MachineDeletion)
+func (r *MachineDeletionRemediationReconciler) getRemediation(ctx context.Context, req ctrl.Request) *v1alpha1.MachineDeletionRemediation {
+	remediation := new(v1alpha1.MachineDeletionRemediation)
 	key := client.ObjectKey{Name: req.Name, Namespace: req.Namespace}
 	if err := r.Client.Get(ctx, key, remediation); err != nil {
 		if !errors.IsNotFound(err) {
@@ -147,7 +148,7 @@ func (r *MachineDeletionReconciler) getRemediation(ctx context.Context, req ctrl
 	return remediation
 }
 
-func (r *MachineDeletionReconciler) getNodeFromMdr(mdr *v1alpha1.MachineDeletion) (*v1.Node, error) {
+func (r *MachineDeletionRemediationReconciler) getNodeFromMdr(mdr *v1alpha1.MachineDeletionRemediation) (*v1.Node, error) {
 	node := &v1.Node{}
 	key := client.ObjectKey{
 		Name: mdr.Name,
@@ -159,7 +160,7 @@ func (r *MachineDeletionReconciler) getNodeFromMdr(mdr *v1alpha1.MachineDeletion
 	return node, nil
 }
 
-func (r *MachineDeletionReconciler) buildMachineFromNode(node *v1.Node) (*unstructured.Unstructured, error) {
+func (r *MachineDeletionRemediationReconciler) buildMachineFromNode(node *v1.Node) (*unstructured.Unstructured, error) {
 
 	var nodeAnnotations map[string]string
 	if nodeAnnotations = node.Annotations; nodeAnnotations == nil {

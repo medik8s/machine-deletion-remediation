@@ -1,4 +1,4 @@
-module github.com/medik8s/machine-deletion
+module github.com/medik8s/machine-deletion-remediation
 
 go 1.19
 

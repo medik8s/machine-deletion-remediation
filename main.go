@@ -31,8 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	appv1alpha1 "github.com/medik8s/machine-deletion/api/v1alpha1"
-	"github.com/medik8s/machine-deletion/controllers"
+	appv1alpha1 "github.com/medik8s/machine-deletion-remediation/api/v1alpha1"
+	"github.com/medik8s/machine-deletion-remediation/controllers"
 	//+kubebuilder:scaffold:imports
 )
 

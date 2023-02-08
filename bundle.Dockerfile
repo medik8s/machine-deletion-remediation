@@ -6,7 +6,8 @@ LABEL operators.operatorframework.io.bundle.manifests.v1=manifests/
 LABEL operators.operatorframework.io.bundle.metadata.v1=metadata/
 LABEL operators.operatorframework.io.bundle.package.v1=machine-deletion-remediation
 LABEL operators.operatorframework.io.bundle.channels.v1=candidate
-LABEL operators.operatorframework.io.metrics.builder=operator-sdk-v1.7.1+git
+LABEL operators.operatorframework.io.bundle.channel.default.v1=candidate
+LABEL operators.operatorframework.io.metrics.builder=operator-sdk-v1.25.1
 LABEL operators.operatorframework.io.metrics.mediatype.v1=metrics+v1
 LABEL operators.operatorframework.io.metrics.project_layout=go.kubebuilder.io/v3
 

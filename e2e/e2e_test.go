@@ -15,7 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/medik8s/machine-deletion-remediation/api/v1alpha1"
@@ -33,20 +32,20 @@ var _ = Describe("E2E tests", func() {
 	Context("Machine Deletion Remediation", func() {
 		Describe("CR created for an unhealthy node", func() {
 			var (
-				node    *v1.Node
-				mdr     *v1alpha1.MachineDeletionRemediation
-				machine *unstructured.Unstructured
+				initialWorkers *v1.NodeList
+				node           *v1.Node
+				mdr            *v1alpha1.MachineDeletionRemediation
+				machine        *unstructured.Unstructured
 			)
 			BeforeEach(func() {
 				// Get the first Worker node available
 				req, _ := labels.NewRequirement(workerLabelName, selection.Exists, []string{})
-
 				selector := labels.NewSelector().Add(*req)
 
-				workers := &v1.NodeList{}
-				Expect(k8sClient.List(context.Background(), workers, &client.ListOptions{LabelSelector: selector})).ToNot(HaveOccurred())
-				Expect(len(workers.Items)).To(BeNumerically(">=", 2))
-				node = &workers.Items[0]
+				initialWorkers = &v1.NodeList{}
+				Expect(k8sClient.List(context.Background(), initialWorkers, &client.ListOptions{LabelSelector: selector})).ToNot(HaveOccurred())
+				Expect(len(initialWorkers.Items)).To(BeNumerically(">=", 2))
+				node = &initialWorkers.Items[0]
 				machine = getAssociatedMachine(node)
 			})
 
@@ -60,7 +59,7 @@ var _ = Describe("E2E tests", func() {
 				}
 			})
 
-			It("recreates the associated Machine", func() {
+			It("deletes the associated Machine", func() {
 				By("checking the Machine was deleted")
 				Eventually(func() bool {
 					key := client.ObjectKeyFromObject(machine)
@@ -68,18 +67,26 @@ var _ = Describe("E2E tests", func() {
 					return errors.IsNotFound(err)
 				}, 5*time.Minute, 10*time.Second).Should(BeTrue())
 
-				By("checking the Node is recreated")
-				newNode := &v1.Node{}
-				Eventually(func() types.UID {
-					key := client.ObjectKeyFromObject(node)
-					if err := k8sClient.Get(context.TODO(), key, newNode); err != nil {
-						return node.GetUID()
-					}
-					newUID := newNode.GetUID()
-					return newUID
-				}, 15*time.Minute, 10*time.Second).ShouldNot(Equal(node.GetUID()))
+				By("checking a new Node was created after the CR")
+				req, _ := labels.NewRequirement(workerLabelName, selection.Exists, []string{})
+				selector := labels.NewSelector().Add(*req)
 
-				By("checking associated Machine was created after the remediation")
+				newWorkers := &v1.NodeList{}
+				Eventually(func() int {
+					Expect(k8sClient.List(context.Background(), newWorkers, &client.ListOptions{LabelSelector: selector})).ToNot(HaveOccurred())
+					return len(newWorkers.Items)
+				}, 15*time.Minute, 10*time.Second).Should(BeNumerically("==", len(initialWorkers.Items)))
+
+				newNode := &v1.Node{}
+				for _, n := range newWorkers.Items {
+					if n.GetCreationTimestamp().Time.After(mdr.GetCreationTimestamp().Time) {
+						newNode = &n
+						break
+					}
+				}
+				Expect(newNode).NotTo(BeNil())
+
+				By("checking the new Machine associated with the Node was created after the CR")
 				newMachine := getAssociatedMachine(newNode)
 				Expect(newMachine.GetUID()).ShouldNot(Equal(machine.GetUID()))
 				Expect(newMachine.GetCreationTimestamp().Time).Should(BeTemporally(">=", mdr.GetCreationTimestamp().Time))

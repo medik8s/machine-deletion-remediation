@@ -77,7 +77,7 @@ var _ = Describe("E2E tests", func() {
 					return len(newWorkers.Items)
 				}, 15*time.Minute, 10*time.Second).Should(BeNumerically("==", len(initialWorkers.Items)))
 
-				newNode := &v1.Node{}
+				var newNode *v1.Node
 				for _, n := range newWorkers.Items {
 					if n.GetCreationTimestamp().Time.After(mdr.GetCreationTimestamp().Time) {
 						newNode = &n

@@ -67,29 +67,27 @@ var _ = Describe("E2E tests", func() {
 					return errors.IsNotFound(err)
 				}, 5*time.Minute, 10*time.Second).Should(BeTrue())
 
-				By("checking a new Node was created after the CR")
-				req, _ := labels.NewRequirement(workerLabelName, selection.Exists, []string{})
-				selector := labels.NewSelector().Add(*req)
+				By("checking a new Node and the Machine associated were created after the CR")
+				Eventually(func(g Gomega) {
+					newWorkers := &v1.NodeList{}
+					req, _ := labels.NewRequirement(workerLabelName, selection.Exists, []string{})
+					selector := labels.NewSelector().Add(*req)
 
-				newWorkers := &v1.NodeList{}
-				Eventually(func() int {
-					Expect(k8sClient.List(context.Background(), newWorkers, &client.ListOptions{LabelSelector: selector})).ToNot(HaveOccurred())
-					return len(newWorkers.Items)
-				}, 15*time.Minute, 10*time.Second).Should(BeNumerically("==", len(initialWorkers.Items)))
+					g.Expect(k8sClient.List(context.Background(), newWorkers, &client.ListOptions{LabelSelector: selector})).ToNot(HaveOccurred())
 
-				var newNode *v1.Node
-				for _, n := range newWorkers.Items {
-					if n.GetCreationTimestamp().Time.After(mdr.GetCreationTimestamp().Time) {
-						newNode = &n
-						break
+					var newNode *v1.Node
+					for _, n := range newWorkers.Items {
+						if n.GetCreationTimestamp().Time.After(mdr.GetCreationTimestamp().Time) {
+							newNode = &n
+							break
+						}
 					}
-				}
-				Expect(newNode).NotTo(BeNil())
+					g.Expect(newNode).NotTo(BeNil())
 
-				By("checking the new Machine associated with the Node was created after the CR")
-				newMachine := getAssociatedMachine(newNode)
-				Expect(newMachine.GetUID()).ShouldNot(Equal(machine.GetUID()))
-				Expect(newMachine.GetCreationTimestamp().Time).Should(BeTemporally(">=", mdr.GetCreationTimestamp().Time))
+					newMachine := getAssociatedMachine(newNode)
+					g.Expect(newMachine.GetUID()).ShouldNot(Equal(machine.GetUID()))
+					g.Expect(newMachine.GetCreationTimestamp().Time).Should(BeTemporally(">=", mdr.GetCreationTimestamp().Time))
+				}, 15*time.Minute, 10*time.Second).Should(Succeed())
 			})
 		})
 	})

@@ -47,8 +47,8 @@ spec:
   - name: Machine Deletion Remediation
     url: https://machine-deletion-remediation.domain
   maintainers:
-  - email: mshitrit@redhat.com
-    name: Michael Shitrit
+  - email: medik8s@googlegroups.com
+    name: Medik8s Team
   maturity: alpha
   provider:
     name: Michael Shitrit

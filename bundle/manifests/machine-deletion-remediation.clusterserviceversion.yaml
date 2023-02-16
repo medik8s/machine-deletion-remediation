@@ -225,5 +225,6 @@ spec:
     name: Medik8s Team
   maturity: alpha
   provider:
-    name: Michael Shitrit
+    name: Medik8s
+    url: https://github.com/medik8s
   version: 0.0.1

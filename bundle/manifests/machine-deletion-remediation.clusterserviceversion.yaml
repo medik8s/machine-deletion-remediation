@@ -22,8 +22,15 @@ metadata:
         }
       ]
     capabilities: Basic Install
+    categories: OpenShift Optional
+    containerImage: ""
+    createdAt: ""
+    description: Machine Deletion Remediation operator for reprovisioning unhealthy
+      nodes using the Machine API.
     operators.operatorframework.io/builder: operator-sdk-v1.25.1
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+    repository: https://github.com/medik8s/machine-deletion-remediation
+    support: Medik8s
   name: machine-deletion-remediation.v0.0.1
   namespace: placeholder
 spec:

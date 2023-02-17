@@ -30,7 +30,7 @@ spec:
       name: machinedeletionremediationtemplates.machine-deletion-remediation.medik8s.io
       version: v1alpha1
   description: machine-deletion-remediation operator
-  displayName: machine-deletion-remediation
+  displayName: Machine Deletion Remediation operator
   icon:
   - base64data: ""
     mediatype: ""

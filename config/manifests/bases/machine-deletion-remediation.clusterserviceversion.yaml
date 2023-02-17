@@ -29,7 +29,10 @@ spec:
       kind: MachineDeletionRemediationTemplate
       name: machinedeletionremediationtemplates.machine-deletion-remediation.medik8s.io
       version: v1alpha1
-  description: machine-deletion-remediation operator
+  description: This operator follows the annotation on the Node to the associated
+    Machine object, confirms that it has an owning controller (e.g. MachineSetController),
+    that will recreate the Machine once deleted, and then proceeds with the deletion
+    of the Machine.
   displayName: Machine Deletion Remediation operator
   icon:
   - base64data: ""

@@ -51,8 +51,11 @@ spec:
   - supported: true
     type: AllNamespaces
   keywords:
+  - medik8s
   - machine
   - deletion
+  - remediation
+  - mdr
   links:
   - name: Machine Deletion Remediation
     url: https://machine-deletion-remediation.domain

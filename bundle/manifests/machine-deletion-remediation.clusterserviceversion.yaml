@@ -22,8 +22,15 @@ metadata:
         }
       ]
     capabilities: Basic Install
+    categories: OpenShift Optional
+    containerImage: ""
+    createdAt: ""
+    description: Machine Deletion Remediation operator for reprovisioning unhealthy
+      nodes using the Machine API.
     operators.operatorframework.io/builder: operator-sdk-v1.25.1
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+    repository: https://github.com/medik8s/machine-deletion-remediation
+    support: Medik8s
   name: machine-deletion-remediation.v0.0.1
   namespace: placeholder
 spec:
@@ -42,8 +49,11 @@ spec:
       kind: MachineDeletionRemediationTemplate
       name: machinedeletionremediationtemplates.machine-deletion-remediation.medik8s.io
       version: v1alpha1
-  description: machine-deletion-remediation operator
-  displayName: machine-deletion-remediation
+  description: This operator follows the annotation on the Node to the associated
+    Machine object, confirms that it has an owning controller (e.g. MachineSetController),
+    that will recreate the Machine once deleted, and then proceeds with the deletion
+    of the Machine.
+  displayName: Machine Deletion Remediation operator
   icon:
   - base64data: ""
     mediatype: ""
@@ -215,15 +225,19 @@ spec:
   - supported: true
     type: AllNamespaces
   keywords:
+  - medik8s
   - machine
   - deletion
+  - remediation
+  - mdr
   links:
   - name: Machine Deletion Remediation
     url: https://machine-deletion-remediation.domain
   maintainers:
-  - email: mshitrit@redhat.com
-    name: Michael Shitrit
+  - email: medik8s@googlegroups.com
+    name: Medik8s Team
   maturity: alpha
   provider:
-    name: Michael Shitrit
+    name: Medik8s
+    url: https://github.com/medik8s
   version: 0.0.1

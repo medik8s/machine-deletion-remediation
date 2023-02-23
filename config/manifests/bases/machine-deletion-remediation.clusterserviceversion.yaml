@@ -43,7 +43,7 @@ spec:
     strategy: ""
   installModes:
   - supported: false
-    type: OwnNamespacell
+    type: OwnNamespace
   - supported: false
     type: SingleNamespace
   - supported: false

@@ -246,3 +246,13 @@ catalog-build: opm ## Build a catalog image.
 .PHONY: catalog-push
 catalog-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
+
+##@ Targets used by CI
+
+.PHONY: container-build
+container-build: ## Build containers
+	make docker-build bundle-build
+
+.PHONY: container-push
+container-push:  ## Push containers (NOTE: catalog can't be build before bundle was pushed)
+	make docker-push bundle-push catalog-build catalog-push

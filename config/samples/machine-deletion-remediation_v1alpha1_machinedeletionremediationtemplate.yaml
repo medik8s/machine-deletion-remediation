@@ -3,4 +3,5 @@ kind: MachineDeletionRemediationTemplate
 metadata:
   name: machinedeletionremediationtemplate-sample
 spec:
-  # TODO(user): Add fields here
+  template:
+    spec: {}

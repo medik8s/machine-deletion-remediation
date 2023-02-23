@@ -18,7 +18,11 @@ metadata:
           "metadata": {
             "name": "machinedeletionremediationtemplate-sample"
           },
-          "spec": null
+          "spec": {
+            "template": {
+              "spec": {}
+            }
+          }
         }
       ]
     capabilities: Basic Install

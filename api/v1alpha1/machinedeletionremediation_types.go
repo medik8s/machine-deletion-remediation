@@ -40,6 +40,7 @@ type MachineDeletionRemediationStatus struct {
 //+kubebuilder:subresource:status
 
 // MachineDeletionRemediation is the Schema for the machinedeletionremediations API
+// +operator-sdk:csv:customresourcedefinitions:resources={{"MachineDeletionRemediation","v1alpha1","machinedeletionremediations"}}
 type MachineDeletionRemediation struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

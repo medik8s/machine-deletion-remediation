@@ -30,8 +30,7 @@ type MachineDeletionRemediationTemplateResource struct {
 
 // MachineDeletionRemediationTemplateSpec defines the desired state of MachineDeletionRemediationTemplate
 type MachineDeletionRemediationTemplateSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	//+operator-sdk:csv:customresourcedefinitions:type=spec
 	Template MachineDeletionRemediationTemplateResource `json:"template"`
 }
 
@@ -45,6 +44,7 @@ type MachineDeletionRemediationTemplateStatus struct {
 //+kubebuilder:subresource:status
 
 // MachineDeletionRemediationTemplate is the Schema for the machinedeletionremediationtemplates API
+// +operator-sdk:csv:customresourcedefinitions:resources={{"MachineDeletionRemediationTemplate","v1alpha1","machinedeletionremediationtemplates"}}
 type MachineDeletionRemediationTemplate struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

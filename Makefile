@@ -248,7 +248,7 @@ endif
 operator-sdk: ## Download operator-sdk locally if necessary.
 	$(call operator-framework-tool, $(OPERATOR_SDK), $(OPERATOR_SDK_DIR),github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/operator-sdk_$${OS}_$${ARCH})
 
-# operator-framework-tool will delete old package $2, then dowmload $3 to $1.
+# operator-framework-tool will delete old package $2, then download $3 to $1.
 define operator-framework-tool
 @[ -f $(1) ]|| { \
 	set -e ;\

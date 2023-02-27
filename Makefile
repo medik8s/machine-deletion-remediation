@@ -217,9 +217,17 @@ bundle: manifests kustomize operator-sdk
 	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
 	$(OPERATOR_SDK) bundle validate ./bundle
 
+##@ Bundle Creation Addition
+## Some addition to bundle creation in the bundle
+.PHONY: bundle-update
+bundle-update: ## Update containerImage and createdAt
+	sed -r -i "s|containerImage: .*|containerImage: $(IMG)|;" ./bundle/manifests/$(OPERATOR_NAME).clusterserviceversion.yaml
+	sed -r -i "s|createdAt: .*|createdAt: \"`date '+%Y-%m-%d %T'`\"|;" ./bundle/manifests/$(OPERATOR_NAME).clusterserviceversion.yaml
+	$(OPERATOR_SDK) bundle validate ./bundle
+
 # Build the bundle image.
 .PHONY: bundle-build
-bundle-build: ## Build the bundle image.
+bundle-build: bundle-update ## Build the bundle image.
 	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 # Push the bundle image

@@ -3,6 +3,10 @@ SHELL := /bin/bash
 
 OPERATOR_NAME := machine-deletion-remediation
 
+## Tool versions
+# See github.com/operator-framework/operator-sdk/releases for the last version
+OPERATOR_SDK_VERSION ?= v1.25.1
+
 # VERSION defines the project version for the bundle. 
 # Update this value when you upgrade the version of your project.
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
@@ -167,6 +171,20 @@ deploy: manifests kustomize
 undeploy:
 	$(KUSTOMIZE) build config/default | kubectl delete -f -
 
+
+##@ Build Dependencies
+
+## Location to install dependencies to
+LOCALBIN ?= $(shell pwd)/bin
+$(LOCALBIN):
+	mkdir -p $(LOCALBIN)
+
+## Default Tool Binaries
+OPERATOR_SDK_DIR ?= $(LOCALBIN)/operator-sdk
+
+## Specific Tool Binaries
+OPERATOR_SDK = $(OPERATOR_SDK_DIR)/$(OPERATOR_SDK_VERSION)/operator-sdk
+
 # Download controller-gen locally if necessary
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 controller-gen:
@@ -193,11 +211,11 @@ endef
 
 # Generate bundle manifests and metadata, then validate generated files.
 .PHONY: bundle
-bundle: manifests kustomize
-	operator-sdk generate kustomize manifests -q
+bundle: manifests kustomize operator-sdk
+	$(OPERATOR_SDK) generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
-	$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
-	operator-sdk bundle validate ./bundle
+	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+	$(OPERATOR_SDK) bundle validate ./bundle
 
 # Build the bundle image.
 .PHONY: bundle-build
@@ -225,6 +243,23 @@ else
 OPM = $(shell which opm)
 endif
 endif
+
+.PHONY: operator-sdk
+operator-sdk: ## Download operator-sdk locally if necessary.
+	$(call operator-framework-tool, $(OPERATOR_SDK), $(OPERATOR_SDK_DIR),github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/operator-sdk_$${OS}_$${ARCH})
+
+# operator-framework-tool will delete old package $2, then download $3 to $1.
+define operator-framework-tool
+@[ -f $(1) ]|| { \
+	set -e ;\
+	rm -rf $(2) ;\
+	mkdir -p $(dir $(1)) ;\
+	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
+	echo "Downloading $(3)" ;\
+	curl -sSLo $(1) $(3) ;\
+	chmod +x $(1) ;\
+	}
+endef
 
 # A comma-separated list of bundle images (e.g. make catalog-build BUNDLE_IMGS=example.com/operator-bundle:v0.1.0,example.com/operator-bundle:v0.2.0).
 # These images MUST exist in a registry and be pull-able.

@@ -11,6 +11,8 @@ spec:
     kind: MachineDeletionRemediationTemplate
     listKind: MachineDeletionRemediationTemplateList
     plural: machinedeletionremediationtemplates
+    shortNames:
+    - mdrt
     singular: machinedeletionremediationtemplate
   scope: Namespaced
   versions:

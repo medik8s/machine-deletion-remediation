@@ -38,6 +38,7 @@ type MachineDeletionRemediationStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:resource:shortName=mdr
 
 // MachineDeletionRemediation is the Schema for the machinedeletionremediations API
 type MachineDeletionRemediation struct {

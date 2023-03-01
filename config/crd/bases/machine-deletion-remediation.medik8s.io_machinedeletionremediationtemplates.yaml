@@ -38,8 +38,8 @@ spec:
               state of MachineDeletionRemediationTemplate
             properties:
               template:
-                description: 'INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-                  Important: Run "make" to regenerate code after modifying this file'
+                description: MachineDeletionRemediationTemplateResource is part of
+                  the desired state of MachineDeletionRemediationTemplate
                 properties:
                   spec:
                     description: MachineDeletionRemediationSpec defines the desired

@@ -10,7 +10,7 @@ metadata:
           "metadata": {
             "name": "machinedeletionremediation-sample"
           },
-          "spec": null
+          "spec": {}
         },
         {
           "apiVersion": "machine-deletion-remediation.medik8s.io/v1alpha1",
@@ -46,12 +46,23 @@ spec:
       displayName: Machine Deletion Remediation
       kind: MachineDeletionRemediation
       name: machinedeletionremediations.machine-deletion-remediation.medik8s.io
+      resources:
+      - kind: MachineDeletionRemediation
+        name: machinedeletionremediations
+        version: v1alpha1
       version: v1alpha1
     - description: MachineDeletionRemediationTemplate is the Schema for the machinedeletionremediationtemplates
         API
       displayName: Machine Deletion Remediation Template
       kind: MachineDeletionRemediationTemplate
       name: machinedeletionremediationtemplates.machine-deletion-remediation.medik8s.io
+      resources:
+      - kind: MachineDeletionRemediationTemplate
+        name: machinedeletionremediationtemplates
+        version: v1alpha1
+      specDescriptors:
+      - displayName: Template
+        path: template
       version: v1alpha1
   description: This operator follows the annotation on the Node to the associated
     Machine object, confirms that it has an owning controller (e.g. MachineSetController),

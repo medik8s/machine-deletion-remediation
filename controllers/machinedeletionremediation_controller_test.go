@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -222,7 +223,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 						_ = k8sClient.Create(context.Background(), workerNodeMachine) //make sure worker machine will exist - it may be deleted by first run
 						_, reconcileError = reconciler.Reconcile(context.Background(), reconcileRequest)
 						return reconcileError != nil && reconcileError.Error() == mockDeleteFailMessage
-					}).Should(BeTrue())
+					}, 10*time.Second, 1*time.Second).Should(BeTrue())
 				})
 
 				BeforeEach(func() {

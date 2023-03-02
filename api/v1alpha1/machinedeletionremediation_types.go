@@ -38,6 +38,7 @@ type MachineDeletionRemediationStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:resource:shortName=mdr
 
 // MachineDeletionRemediation is the Schema for the machinedeletionremediations API
 // +operator-sdk:csv:customresourcedefinitions:resources={{"MachineDeletionRemediation","v1alpha1","machinedeletionremediations"}}

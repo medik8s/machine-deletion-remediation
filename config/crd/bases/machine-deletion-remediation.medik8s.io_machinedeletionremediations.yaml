@@ -12,6 +12,8 @@ spec:
     kind: MachineDeletionRemediation
     listKind: MachineDeletionRemediationList
     plural: machinedeletionremediations
+    shortNames:
+    - mdr
     singular: machinedeletionremediation
   scope: Namespaced
   versions:

@@ -227,7 +227,7 @@ bundle-update: ## Update containerImage and createdAt
 
 # Build the bundle image.
 .PHONY: bundle-build
-bundle-build: bundle-update ## Build the bundle image.
+bundle-build: bundle bundle-update ## Build the bundle image.
 	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 # Push the bundle image

@@ -191,6 +191,9 @@ spec:
                     memory: 20Mi
                 securityContext:
                   allowPrivilegeEscalation: false
+                  capabilities:
+                    drop:
+                    - ALL
               securityContext:
                 runAsNonRoot: true
               serviceAccountName: machine-deletion-remediation-controller-manager

@@ -13,6 +13,11 @@ OPM_VERSION = v1.15.1
 # versions at  https://github.com/kubernetes-sigs/controller-tools/releases
 CONTROLLER_GEN_VERSION = v0.9.2
 
+# versions at https://github.com/kubernetes-sigs/kustomize/releases
+KUSTOMIZE_VERSION = v4.5.7
+# update for major version updates to KUSTOMIZE_VERSION!
+KUSTOMIZE_API_VERSION = v4
+
 # VERSION defines the project version for the bundle. 
 # Update this value when you upgrade the version of your project.
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
@@ -191,9 +196,9 @@ controller-gen:
 	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_GEN_VERSION))
 
 # Download kustomize locally if necessary
-KUSTOMIZE = $(shell pwd)/bin/kustomize
+KUSTOMIZE = $(LOCALBIN)/kustomize
 kustomize:
-	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v4@v4.5.7)
+	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/$(KUSTOMIZE_API_VERSION)@$(KUSTOMIZE_VERSION))
 
 # go-install-tool will 'go install' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))

@@ -10,6 +10,9 @@ OPERATOR_SDK_VERSION ?= v1.25.1
 # versions at https://github.com/operator-framework/operator-registry/releases
 OPM_VERSION = v1.15.1
 
+# versions at  https://github.com/kubernetes-sigs/controller-tools/releases
+CONTROLLER_GEN_VERSION = v0.9.2
+
 # VERSION defines the project version for the bundle. 
 # Update this value when you upgrade the version of your project.
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
@@ -183,9 +186,9 @@ $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 
 # Download controller-gen locally if necessary
-CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
+CONTROLLER_GEN = $(LOCALBIN)/controller-gen
 controller-gen:
-	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.9.2)
+	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_GEN_VERSION))
 
 # Download kustomize locally if necessary
 KUSTOMIZE = $(shell pwd)/bin/kustomize

@@ -7,6 +7,9 @@ OPERATOR_NAME := machine-deletion-remediation
 # See github.com/operator-framework/operator-sdk/releases for the last version
 OPERATOR_SDK_VERSION ?= v1.25.1
 
+# versions at https://github.com/operator-framework/operator-registry/releases
+OPM_VERSION = v1.15.1
+
 # VERSION defines the project version for the bundle. 
 # Update this value when you upgrade the version of your project.
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
@@ -230,21 +233,10 @@ bundle-push: ## Push the bundle image.
 	$(MAKE) docker-push IMG=$(BUNDLE_IMG)
 
 .PHONY: opm
-OPM = ./bin/opm
+OPM_DIR = $(LOCALBIN)/opm
+OPM = $(OPM_DIR)/$(OPM_VERSION)/opm
 opm: ## Download opm locally if necessary.
-ifeq (,$(wildcard $(OPM)))
-ifeq (,$(shell which opm 2>/dev/null))
-	@{ \
-	set -e ;\
-	mkdir -p $(dir $(OPM)) ;\
-	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/v1.15.1/$${OS}-$${ARCH}-opm ;\
-	chmod +x $(OPM) ;\
-	}
-else
-OPM = $(shell which opm)
-endif
-endif
+	$(call operator-framework-tool, $(OPM), $(OPM_DIR),https://github.com/operator-framework/operator-registry/releases/download/$(OPM_VERSION)/$${OS}-$${ARCH}-opm )
 
 .PHONY: operator-sdk
 OPERATOR_SDK_DIR ?= $(LOCALBIN)/operator-sdk

@@ -17,7 +17,7 @@ limitations under the License.
 package controllers
 
 import (
-	"os"
+	"context"
 	"path/filepath"
 	"testing"
 
@@ -44,12 +44,8 @@ import (
 var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
-
-const (
-	envVarApiServer = "TEST_ASSET_KUBE_APISERVER"
-	envVarETCD      = "TEST_ASSET_ETCD"
-	envVarKUBECTL   = "TEST_ASSET_KUBECTL"
-)
+var ctx context.Context
+var cancel context.CancelFunc
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -58,16 +54,6 @@ func TestAPIs(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	if _, isFound := os.LookupEnv(envVarApiServer); !isFound {
-		Expect(os.Setenv(envVarApiServer, "../testbin/bin/kube-apiserver")).To(Succeed())
-	}
-	if _, isFound := os.LookupEnv(envVarETCD); !isFound {
-		Expect(os.Setenv(envVarETCD, "../testbin/bin/etcd")).To(Succeed())
-	}
-	if _, isFound := os.LookupEnv(envVarKUBECTL); !isFound {
-		Expect(os.Setenv(envVarKUBECTL, "../testbin/bin/kubectl")).To(Succeed())
-	}
-
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
 	By("bootstrapping test environment")
@@ -104,22 +90,19 @@ var _ = BeforeSuite(func() {
 
 	go func() {
 		defer GinkgoRecover()
-		err = k8sManager.Start(ctrl.SetupSignalHandler())
+		ctx, cancel = context.WithCancel(ctrl.SetupSignalHandler())
+		err = k8sManager.Start(ctx)
 		Expect(err).ToNot(HaveOccurred())
 	}()
 
 	k8sClient = k8sManager.GetClient()
 	Expect(k8sClient).ToNot(BeNil())
 	v1beta1.AddToScheme(k8sClient.Scheme())
-
 })
 
 var _ = AfterSuite(func() {
 	By("tearing down the test environment")
+	cancel()
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
-
-	Expect(os.Unsetenv(envVarApiServer)).To(Succeed())
-	Expect(os.Unsetenv(envVarETCD)).To(Succeed())
-	Expect(os.Unsetenv(envVarKUBECTL)).To(Succeed())
 })

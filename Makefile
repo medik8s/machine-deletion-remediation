@@ -179,12 +179,6 @@ LOCALBIN ?= $(shell pwd)/bin
 $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 
-## Default Tool Binaries
-OPERATOR_SDK_DIR ?= $(LOCALBIN)/operator-sdk
-
-## Specific Tool Binaries
-OPERATOR_SDK = $(OPERATOR_SDK_DIR)/$(OPERATOR_SDK_VERSION)/operator-sdk
-
 # Download controller-gen locally if necessary
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 controller-gen:
@@ -253,12 +247,14 @@ endif
 endif
 
 .PHONY: operator-sdk
+OPERATOR_SDK_DIR ?= $(LOCALBIN)/operator-sdk
+OPERATOR_SDK = $(OPERATOR_SDK_DIR)/$(OPERATOR_SDK_VERSION)/operator-sdk
 operator-sdk: ## Download operator-sdk locally if necessary.
 	$(call operator-framework-tool, $(OPERATOR_SDK), $(OPERATOR_SDK_DIR),github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/operator-sdk_$${OS}_$${ARCH})
 
 # operator-framework-tool will delete old package $2, then download $3 to $1.
 define operator-framework-tool
-@[ -f $(1) ]|| { \
+@[ -f $(1) ] || { \
 	set -e ;\
 	rm -rf $(2) ;\
 	mkdir -p $(dir $(1)) ;\

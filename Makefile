@@ -23,6 +23,9 @@ ENVTEST_VERSION = v0.0.0-20230208013708-22718275bffe
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.23
 
+# See https://pkg.go.dev/golang.org/x/tools/cmd/goimports?tab=versions for the last version
+GOIMPORTS_VERSION ?= v0.6.0
+
 # VERSION defines the project version for the bundle. 
 # Update this value when you upgrade the version of your project.
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
@@ -121,9 +124,9 @@ manifests: controller-gen
 generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
-# Run go fmt against code
-fmt:
-	go fmt ./...
+.PHONY: fmt
+fmt: goimports ## Run go goimports against code - goimports = go fmt + fixing imports.
+	$(GOIMPORTS) -w  ./main.go ./api ./controllers ./e2e
 
 # Run go vet against code
 vet:
@@ -207,6 +210,11 @@ ENVTEST = $(LOCALBIN)/setup-envtest
 .PHONY: envtest
 envtest: ## Download envtest-setup locally if necessary.
 	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_VERSION))
+
+GOIMPORTS = $(LOCALBIN)/goimports
+.PHONY: goimports
+goimports: ## Download goimports locally if necessary.
+	$(call go-install-tool,$(GOIMPORTS),golang.org/x/tools/cmd/goimports@$(GOIMPORTS_VERSION))
 
 # go-install-tool will 'go install' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))

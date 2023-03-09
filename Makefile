@@ -26,6 +26,9 @@ ENVTEST_K8S_VERSION = 1.23
 # See https://pkg.go.dev/golang.org/x/tools/cmd/goimports?tab=versions for the last version
 GOIMPORTS_VERSION ?= v0.6.0
 
+# See https://github.com/slintes/sort-imports/releases for the last version
+SORT_IMPORTS_VERSION = v0.1.0
+
 # VERSION defines the project version for the bundle. 
 # Update this value when you upgrade the version of your project.
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
@@ -132,6 +135,14 @@ fmt: goimports ## Run go goimports against code - goimports = go fmt + fixing im
 vet:
 	go vet ./...
 
+# Check for sorted imports
+test-imports: sort-imports
+	$(SORT_IMPORTS) .
+
+# Sort imports
+fix-imports: sort-imports
+	$(SORT_IMPORTS) . -w
+
 verify-no-changes: ## verify no there are no un-staged changes
 	./hack/verify-diff.sh
 
@@ -139,7 +150,7 @@ fetch-mutation: ## fetch mutation package.
 	GO111MODULE=off go get -t -v github.com/mshitrit/go-mutesting/...
 
 # Run tests
-test: manifests generate fmt vet envtest 
+test: manifests generate test-imports fmt vet envtest 
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path  --bin-dir $(PROJECT_DIR)/testbin)" \
 		go test ./controllers/... -coverprofile cover.out
 
@@ -215,6 +226,11 @@ GOIMPORTS = $(LOCALBIN)/goimports
 .PHONY: goimports
 goimports: ## Download goimports locally if necessary.
 	$(call go-install-tool,$(GOIMPORTS),golang.org/x/tools/cmd/goimports@$(GOIMPORTS_VERSION))
+
+SORT_IMPORTS = $(LOCALBIN)/sort-imports
+.PHONY: sort-imports
+sort-imports: ## Download sort-imports locally if necessary.
+	$(call go-install-tool,$(SORT_IMPORTS),github.com/slintes/sort-imports@$(SORT_IMPORTS_VERSION))
 
 # go-install-tool will 'go install' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))

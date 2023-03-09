@@ -17,8 +17,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/medik8s/machine-deletion-remediation/api/v1alpha1"
 	"github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+
+	"github.com/medik8s/machine-deletion-remediation/api/v1alpha1"
 )
 
 const (

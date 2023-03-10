@@ -27,7 +27,7 @@ ENVTEST_K8S_VERSION = 1.23
 GOIMPORTS_VERSION ?= v0.6.0
 
 # See https://github.com/slintes/sort-imports/releases for the last version
-SORT_IMPORTS_VERSION = v0.1.0
+SORT_IMPORTS_VERSION = v0.2.1
 
 # VERSION defines the project version for the bundle. 
 # Update this value when you upgrade the version of your project.
@@ -141,7 +141,7 @@ test-imports: sort-imports
 
 # Sort imports
 fix-imports: sort-imports
-	$(SORT_IMPORTS) . -w
+	$(SORT_IMPORTS) -w .
 
 verify-no-changes: ## verify no there are no un-staged changes
 	./hack/verify-diff.sh

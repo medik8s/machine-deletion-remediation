@@ -4,29 +4,29 @@ SHELL := /bin/bash
 OPERATOR_NAME := machine-deletion-remediation
 
 ## Tool versions
-# See github.com/operator-framework/operator-sdk/releases for the last version
+# OPERATOR_SDK versions at github.com/operator-framework/operator-sdk/releases
 OPERATOR_SDK_VERSION ?= v1.25.1
 
-# versions at https://github.com/operator-framework/operator-registry/releases
+# OPM versions at https://github.com/operator-framework/operator-registry/releases
 OPM_VERSION = v1.15.1
 
-# versions at  https://github.com/kubernetes-sigs/controller-tools/releases
+# CONTROLLER_GEN versions at https://github.com/kubernetes-sigs/controller-tools/releases
 CONTROLLER_GEN_VERSION = v0.9.2
 
-# versions at https://github.com/kubernetes-sigs/kustomize/releases
-KUSTOMIZE_VERSION = v4.5.7
-# update for major version updates to KUSTOMIZE_VERSION!
+# KUSTOMIZE versions at https://github.com/kubernetes-sigs/kustomize/releases
+# note: update KUSTOMIZE_VERSION and KUSTOMIZE_API_VERSION accordingly.
 KUSTOMIZE_API_VERSION = v4
+KUSTOMIZE_VERSION = v4.5.7
 
- # no tagged versions
-ENVTEST_VERSION = v0.0.0-20230208013708-22718275bffe
+# ENVTEST has no tagged versions yet
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
+ENVTEST_VERSION = v0.0.0-20230208013708-22718275bffe
 ENVTEST_K8S_VERSION = 1.23
 
-# See https://pkg.go.dev/golang.org/x/tools/cmd/goimports?tab=versions for the last version
+# GoImports versions at https://pkg.go.dev/golang.org/x/tools/cmd/goimports?tab=versions
 GOIMPORTS_VERSION ?= v0.6.0
 
-# See https://github.com/slintes/sort-imports/releases for the last version
+# Sort-imports versions at https://github.com/slintes/sort-imports/releases
 SORT_IMPORTS_VERSION = v0.2.1
 
 # VERSION defines the project version for the bundle. 

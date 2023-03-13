@@ -99,6 +99,7 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
+.PHONY: all
 all: manager
 
 ##@ General
@@ -114,16 +115,19 @@ all: manager
 # More info on the awk command:
 # http://linuxcommand.org/lc3_adv_awk.php
 
+.PHONY: help
 help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 ##@ Development
 
 # Generate manifests e.g. CRD, RBAC etc.
+.PHONY: manifests
 manifests: controller-gen
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 # Generate code
+.PHONY: generate
 generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
@@ -132,20 +136,23 @@ fmt: goimports ## Run go goimports against code - goimports = go fmt + fixing im
 	$(GOIMPORTS) -w  ./main.go ./api ./controllers ./e2e
 
 # Run go vet against code
+.PHONY: vet
 vet:
 	go vet ./...
 
-# Check for sorted imports
-test-imports: sort-imports
+.PHONY: test-imports
+test-imports: sort-imports ## Check for sorted imports
 	$(SORT_IMPORTS) .
 
-# Sort imports
-fix-imports: sort-imports
+.PHONY: fix-imports
+fix-imports: sort-imports ## Sort imports
 	$(SORT_IMPORTS) -w .
 
+.PHONY: verify-no-changes
 verify-no-changes: ## verify no there are no un-staged changes
 	./hack/verify-diff.sh
 
+.PHONY: fetch-mutation
 fetch-mutation: ## fetch mutation package.
 	GO111MODULE=off go get -t -v github.com/mshitrit/go-mutesting/...
 
@@ -161,9 +168,8 @@ test-mutation: verify-no-changes fetch-mutation ## Run mutation tests in manual 
 test-mutation-ci: fetch-mutation ## Run mutation tests as part of auto build process.
 	./hack/test-mutation.sh
 
-# Run end to end tests
 .PHONY: test-e2e
-test-e2e:
+test-e2e: ## Run end to end tests
 	# KUBECONFIG must be set to the cluster, and MDR needs to be deployed already
 	@test -n "${KUBECONFIG}" -o -r ${HOME}/.kube/config || (echo "Failed to find kubeconfig in ~/.kube/config or no KUBECONFIG set"; exit 1)
 	go test ./e2e -coverprofile cover.out -v -timeout 25m -ginkgo.vv
@@ -183,19 +189,23 @@ docker-push: ## Push docker image with the manager.
 
 ##@ Deployment
 
+.PHONY: install
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/crd | kubectl apply -f -
 
 # Uninstall CRDs from a cluster
+.PHONY: uninstall
 uninstall: manifests kustomize
 	$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
+.PHONY: deploy
 deploy: manifests kustomize
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
 # UnDeploy controller from the configured Kubernetes cluster in ~/.kube/config
+.PHONY: undeploy
 undeploy:
 	$(KUSTOMIZE) build config/default | kubectl delete -f -
 
@@ -207,28 +217,29 @@ LOCALBIN ?= $(shell pwd)/bin
 $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 
-# Download controller-gen locally if necessary
+.PHONY: controller-gen
 CONTROLLER_GEN = $(LOCALBIN)/controller-gen
-controller-gen:
+controller-gen: ## Download controller-gen locally if necessary
 	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_GEN_VERSION))
 
-# Download kustomize locally if necessary
+
+.PHONY: kustomize
 KUSTOMIZE = $(LOCALBIN)/kustomize
-kustomize:
+kustomize: ## Download kustomize locally if necessary
 	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/$(KUSTOMIZE_API_VERSION)@$(KUSTOMIZE_VERSION))
 
-ENVTEST = $(LOCALBIN)/setup-envtest
 .PHONY: envtest
+ENVTEST = $(LOCALBIN)/setup-envtest
 envtest: ## Download envtest-setup locally if necessary.
 	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_VERSION))
 
-GOIMPORTS = $(LOCALBIN)/goimports
 .PHONY: goimports
+GOIMPORTS = $(LOCALBIN)/goimports
 goimports: ## Download goimports locally if necessary.
 	$(call go-install-tool,$(GOIMPORTS),golang.org/x/tools/cmd/goimports@$(GOIMPORTS_VERSION))
 
-SORT_IMPORTS = $(LOCALBIN)/sort-imports
 .PHONY: sort-imports
+SORT_IMPORTS = $(LOCALBIN)/sort-imports
 sort-imports: ## Download sort-imports locally if necessary.
 	$(call go-install-tool,$(SORT_IMPORTS),github.com/slintes/sort-imports@$(SORT_IMPORTS_VERSION))
 
@@ -246,9 +257,8 @@ rm -rf $$TMP_DIR ;\
 }
 endef
 
-# Generate bundle manifests and metadata, then validate generated files.
 .PHONY: bundle
-bundle: manifests kustomize operator-sdk
+bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metadata, then validate generated files.
 	$(OPERATOR_SDK) generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
@@ -313,7 +323,6 @@ endif
 catalog-build: opm ## Build a catalog image.
 	$(OPM) index add --container-tool docker --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT)
 
-# Push the catalog image.
 .PHONY: catalog-push
 catalog-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)

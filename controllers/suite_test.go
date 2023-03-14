@@ -17,22 +17,21 @@ limitations under the License.
 package controllers
 
 import (
-	"os"
+	"context"
 	"path/filepath"
 	"testing"
-
-	"github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	"github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 
 	"github.com/medik8s/machine-deletion-remediation/api/v1alpha1"
 	//+kubebuilder:scaffold:imports
@@ -41,14 +40,11 @@ import (
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
-var cfg *rest.Config
-var k8sClient client.Client
-var testEnv *envtest.Environment
-
-const (
-	envVarApiServer = "TEST_ASSET_KUBE_APISERVER"
-	envVarETCD      = "TEST_ASSET_ETCD"
-	envVarKUBECTL   = "TEST_ASSET_KUBECTL"
+var (
+	k8sClient client.Client
+	testEnv   *envtest.Environment
+	ctx       context.Context
+	cancel    context.CancelFunc
 )
 
 func TestAPIs(t *testing.T) {
@@ -58,16 +54,6 @@ func TestAPIs(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	if _, isFound := os.LookupEnv(envVarApiServer); !isFound {
-		Expect(os.Setenv(envVarApiServer, "../testbin/bin/kube-apiserver")).To(Succeed())
-	}
-	if _, isFound := os.LookupEnv(envVarETCD); !isFound {
-		Expect(os.Setenv(envVarETCD, "../testbin/bin/etcd")).To(Succeed())
-	}
-	if _, isFound := os.LookupEnv(envVarKUBECTL); !isFound {
-		Expect(os.Setenv(envVarKUBECTL, "../testbin/bin/kubectl")).To(Succeed())
-	}
-
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
 	By("bootstrapping test environment")
@@ -104,22 +90,19 @@ var _ = BeforeSuite(func() {
 
 	go func() {
 		defer GinkgoRecover()
-		err = k8sManager.Start(ctrl.SetupSignalHandler())
+		ctx, cancel = context.WithCancel(ctrl.SetupSignalHandler())
+		err = k8sManager.Start(ctx)
 		Expect(err).ToNot(HaveOccurred())
 	}()
 
 	k8sClient = k8sManager.GetClient()
 	Expect(k8sClient).ToNot(BeNil())
 	v1beta1.AddToScheme(k8sClient.Scheme())
-
 })
 
 var _ = AfterSuite(func() {
 	By("tearing down the test environment")
+	cancel()
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
-
-	Expect(os.Unsetenv(envVarApiServer)).To(Succeed())
-	Expect(os.Unsetenv(envVarETCD)).To(Succeed())
-	Expect(os.Unsetenv(envVarKUBECTL)).To(Succeed())
 })

@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"github.com/go-logr/logr"
 	"go.uber.org/zap/zapcore"
 
 	"k8s.io/api/apps/v1beta1"

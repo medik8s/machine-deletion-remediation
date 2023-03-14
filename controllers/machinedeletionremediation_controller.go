@@ -22,13 +22,15 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
-	"github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
-	v1 "k8s.io/api/core/v1"
+
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 
 	"github.com/medik8s/machine-deletion-remediation/api/v1alpha1"
 )

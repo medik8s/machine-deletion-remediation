@@ -4,8 +4,30 @@ SHELL := /bin/bash
 OPERATOR_NAME := machine-deletion-remediation
 
 ## Tool versions
-# See github.com/operator-framework/operator-sdk/releases for the last version
+# OPERATOR_SDK versions at github.com/operator-framework/operator-sdk/releases
 OPERATOR_SDK_VERSION ?= v1.25.1
+
+# OPM versions at https://github.com/operator-framework/operator-registry/releases
+OPM_VERSION = v1.15.1
+
+# CONTROLLER_GEN versions at https://github.com/kubernetes-sigs/controller-tools/releases
+CONTROLLER_GEN_VERSION = v0.9.2
+
+# KUSTOMIZE versions at https://github.com/kubernetes-sigs/kustomize/releases
+# note: update KUSTOMIZE_VERSION and KUSTOMIZE_API_VERSION accordingly.
+KUSTOMIZE_API_VERSION = v4
+KUSTOMIZE_VERSION = v4.5.7
+
+# ENVTEST has no tagged versions yet
+# ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
+ENVTEST_VERSION = v0.0.0-20230208013708-22718275bffe
+ENVTEST_K8S_VERSION = 1.23
+
+# GoImports versions at https://pkg.go.dev/golang.org/x/tools/cmd/goimports?tab=versions
+GOIMPORTS_VERSION ?= v0.6.0
+
+# Sort-imports versions at https://github.com/slintes/sort-imports/releases
+SORT_IMPORTS_VERSION = v0.2.1
 
 # VERSION defines the project version for the bundle. 
 # Update this value when you upgrade the version of your project.
@@ -77,6 +99,7 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
+.PHONY: all
 all: manager
 
 ##@ General
@@ -92,39 +115,51 @@ all: manager
 # More info on the awk command:
 # http://linuxcommand.org/lc3_adv_awk.php
 
+.PHONY: help
 help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 ##@ Development
 
 # Generate manifests e.g. CRD, RBAC etc.
+.PHONY: manifests
 manifests: controller-gen
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 # Generate code
+.PHONY: generate
 generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
-# Run go fmt against code
-fmt:
-	go fmt ./...
+.PHONY: fmt
+fmt: goimports ## Run go goimports against code - goimports = go fmt + fixing imports.
+	$(GOIMPORTS) -w  ./main.go ./api ./controllers ./e2e
 
 # Run go vet against code
+.PHONY: vet
 vet:
 	go vet ./...
 
+.PHONY: test-imports
+test-imports: sort-imports ## Check for sorted imports
+	$(SORT_IMPORTS) .
+
+.PHONY: fix-imports
+fix-imports: sort-imports ## Sort imports
+	$(SORT_IMPORTS) -w .
+
+.PHONY: verify-no-changes
 verify-no-changes: ## verify no there are no un-staged changes
 	./hack/verify-diff.sh
 
+.PHONY: fetch-mutation
 fetch-mutation: ## fetch mutation package.
 	GO111MODULE=off go get -t -v github.com/mshitrit/go-mutesting/...
 
 # Run tests
-ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
-test: manifests generate fmt vet
-	mkdir -p ${ENVTEST_ASSETS_DIR}
-	test -f ${ENVTEST_ASSETS_DIR}/setup-envtest.sh || curl -sSLo ${ENVTEST_ASSETS_DIR}/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/v0.8.3/hack/setup-envtest.sh
-	source ${ENVTEST_ASSETS_DIR}/setup-envtest.sh; fetch_envtest_tools $(ENVTEST_ASSETS_DIR); setup_envtest_env $(ENVTEST_ASSETS_DIR); go test ./controllers/... -coverprofile cover.out
+test: manifests generate test-imports fmt vet envtest 
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path  --bin-dir $(PROJECT_DIR)/testbin)" \
+		go test ./controllers/... -coverprofile cover.out
 
 test-mutation: verify-no-changes fetch-mutation ## Run mutation tests in manual mode.
 	echo -e "## Verifying diff ## \n##Mutations tests actually changes the code while running - this is a safeguard in order to be able to easily revert mutation tests changes (in case mutation tests have not completed properly)##"
@@ -133,9 +168,8 @@ test-mutation: verify-no-changes fetch-mutation ## Run mutation tests in manual 
 test-mutation-ci: fetch-mutation ## Run mutation tests as part of auto build process.
 	./hack/test-mutation.sh
 
-# Run end to end tests
 .PHONY: test-e2e
-test-e2e:
+test-e2e: ## Run end to end tests
 	# KUBECONFIG must be set to the cluster, and MDR needs to be deployed already
 	@test -n "${KUBECONFIG}" -o -r ${HOME}/.kube/config || (echo "Failed to find kubeconfig in ~/.kube/config or no KUBECONFIG set"; exit 1)
 	go test ./e2e -coverprofile cover.out -v -timeout 25m -ginkgo.vv
@@ -155,19 +189,23 @@ docker-push: ## Push docker image with the manager.
 
 ##@ Deployment
 
+.PHONY: install
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/crd | kubectl apply -f -
 
 # Uninstall CRDs from a cluster
+.PHONY: uninstall
 uninstall: manifests kustomize
 	$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
+.PHONY: deploy
 deploy: manifests kustomize
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
 # UnDeploy controller from the configured Kubernetes cluster in ~/.kube/config
+.PHONY: undeploy
 undeploy:
 	$(KUSTOMIZE) build config/default | kubectl delete -f -
 
@@ -179,21 +217,31 @@ LOCALBIN ?= $(shell pwd)/bin
 $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 
-## Default Tool Binaries
-OPERATOR_SDK_DIR ?= $(LOCALBIN)/operator-sdk
+.PHONY: controller-gen
+CONTROLLER_GEN = $(LOCALBIN)/controller-gen
+controller-gen: ## Download controller-gen locally if necessary
+	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_GEN_VERSION))
 
-## Specific Tool Binaries
-OPERATOR_SDK = $(OPERATOR_SDK_DIR)/$(OPERATOR_SDK_VERSION)/operator-sdk
 
-# Download controller-gen locally if necessary
-CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
-controller-gen:
-	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.9.2)
+.PHONY: kustomize
+KUSTOMIZE = $(LOCALBIN)/kustomize
+kustomize: ## Download kustomize locally if necessary
+	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/$(KUSTOMIZE_API_VERSION)@$(KUSTOMIZE_VERSION))
 
-# Download kustomize locally if necessary
-KUSTOMIZE = $(shell pwd)/bin/kustomize
-kustomize:
-	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v4@v4.5.7)
+.PHONY: envtest
+ENVTEST = $(LOCALBIN)/setup-envtest
+envtest: ## Download envtest-setup locally if necessary.
+	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_VERSION))
+
+.PHONY: goimports
+GOIMPORTS = $(LOCALBIN)/goimports
+goimports: ## Download goimports locally if necessary.
+	$(call go-install-tool,$(GOIMPORTS),golang.org/x/tools/cmd/goimports@$(GOIMPORTS_VERSION))
+
+.PHONY: sort-imports
+SORT_IMPORTS = $(LOCALBIN)/sort-imports
+sort-imports: ## Download sort-imports locally if necessary.
+	$(call go-install-tool,$(SORT_IMPORTS),github.com/slintes/sort-imports@$(SORT_IMPORTS_VERSION))
 
 # go-install-tool will 'go install' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
@@ -209,9 +257,8 @@ rm -rf $$TMP_DIR ;\
 }
 endef
 
-# Generate bundle manifests and metadata, then validate generated files.
 .PHONY: bundle
-bundle: manifests kustomize operator-sdk
+bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metadata, then validate generated files.
 	$(OPERATOR_SDK) generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
@@ -236,29 +283,20 @@ bundle-push: ## Push the bundle image.
 	$(MAKE) docker-push IMG=$(BUNDLE_IMG)
 
 .PHONY: opm
-OPM = ./bin/opm
+OPM_DIR = $(LOCALBIN)/opm
+OPM = $(OPM_DIR)/$(OPM_VERSION)/opm
 opm: ## Download opm locally if necessary.
-ifeq (,$(wildcard $(OPM)))
-ifeq (,$(shell which opm 2>/dev/null))
-	@{ \
-	set -e ;\
-	mkdir -p $(dir $(OPM)) ;\
-	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/v1.15.1/$${OS}-$${ARCH}-opm ;\
-	chmod +x $(OPM) ;\
-	}
-else
-OPM = $(shell which opm)
-endif
-endif
+	$(call operator-framework-tool, $(OPM), $(OPM_DIR),https://github.com/operator-framework/operator-registry/releases/download/$(OPM_VERSION)/$${OS}-$${ARCH}-opm )
 
 .PHONY: operator-sdk
+OPERATOR_SDK_DIR ?= $(LOCALBIN)/operator-sdk
+OPERATOR_SDK = $(OPERATOR_SDK_DIR)/$(OPERATOR_SDK_VERSION)/operator-sdk
 operator-sdk: ## Download operator-sdk locally if necessary.
 	$(call operator-framework-tool, $(OPERATOR_SDK), $(OPERATOR_SDK_DIR),github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/operator-sdk_$${OS}_$${ARCH})
 
 # operator-framework-tool will delete old package $2, then download $3 to $1.
 define operator-framework-tool
-@[ -f $(1) ]|| { \
+@[ -f $(1) ] || { \
 	set -e ;\
 	rm -rf $(2) ;\
 	mkdir -p $(dir $(1)) ;\
@@ -285,7 +323,6 @@ endif
 catalog-build: opm ## Build a catalog image.
 	$(OPM) index add --container-tool docker --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT)
 
-# Push the catalog image.
 .PHONY: catalog-push
 catalog-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)

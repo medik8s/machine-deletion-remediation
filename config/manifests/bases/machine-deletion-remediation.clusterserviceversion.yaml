@@ -40,10 +40,24 @@ spec:
       - displayName: Template
         path: template
       version: v1alpha1
-  description: This operator follows the annotation on the Node to the associated
-    Machine object, confirms that it has an owning controller (e.g. MachineSetController),
-    that will recreate the Machine once deleted, and then proceeds with the deletion
-    of the Machine.
+  description: |
+    Machine Deletion Remediation (MDR) is a remediator designed to reprovision unhealthy
+    nodes using the Machine API. MDR can be used together with NodeHealthCheck (NHC),
+    which detects the unhealthy Node and creates the Custom Resource for MDR.
+
+    # How it works
+    MDR follows the annotation on the Node to the associated Machine object, confirms
+    that it has an owning controller (e.g. MachineSetController), that will recreate the
+    Machine once deleted, and then proceeds with deleting the Machine.
+
+    # How to use MDR with NHC
+    Since NHC comes with Self Node Remediation as the default remediation mechanism,
+    it needs to be configured to use MDR with the following steps
+
+    - Create the MDR Template CR
+    - Modify NHC's `.spec.remediationTemplate` to use MDR as it's remediator
+
+    see https://github.com/medik8s/machine-deletion-remediation#readme for configuration examples.
   displayName: Machine Deletion Remediation operator
   icon:
   - base64data: ""

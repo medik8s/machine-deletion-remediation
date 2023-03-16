@@ -70,8 +70,6 @@ type MachineDeletionRemediationReconciler struct {
 func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("machinedeletionremediation", req.NamespacedName)
 
-	log.Info("reconciling...")
-
 	//fetch the remediation
 	var remediation *v1alpha1.MachineDeletionRemediation
 	if remediation = r.getRemediation(ctx, req); remediation == nil {
@@ -95,6 +93,7 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 		return ctrl.Result{}, err
 	}
 
+	log.Info("reconciling", "node", remediation.Name, "associated machine", machine.GetName())
 	if err := r.deleteMachineOfNode(ctx, machine, remediation.Name); err != nil {
 		return ctrl.Result{}, err
 	}

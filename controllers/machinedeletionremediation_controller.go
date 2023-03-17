@@ -70,28 +70,27 @@ type MachineDeletionRemediationReconciler struct {
 func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("machinedeletionremediation", req.NamespacedName)
 
-	//fetch the remediation
 	var err error
 	var remediation *v1alpha1.MachineDeletionRemediation
 	if remediation, err = r.getRemediation(ctx, req); remediation == nil || err != nil {
 		return ctrl.Result{}, err
 	}
 
-	var machine *unstructured.Unstructured
-	//Health check was done by NHC
-	if node, err := r.getNodeFromMdr(remediation); err == nil {
-		if machine, err = r.buildMachineFromNode(node); err != nil {
-			r.Log.Error(err, "failed to fetch machine of node", "node name", node.Name)
-			return ctrl.Result{}, err
-		}
-		if !hasControllerOwner(machine) {
-			r.Log.Info("ignoring remediation of machine associated to node, since the machine has no controller owner", "node name", remediation.Name)
-			return ctrl.Result{}, nil
-		}
-
-	} else { //Failed fetching the node
+	var node *v1.Node
+	if node, err = r.getNodeFromMdr(remediation); err != nil {
 		r.Log.Error(err, "failed to fetch node", "node name", remediation.Name)
 		return ctrl.Result{}, err
+	}
+
+	var machine *unstructured.Unstructured
+	if machine, err = r.buildMachineFromNode(node); err != nil {
+		r.Log.Error(err, "failed to fetch machine of node", "node name", node.Name)
+		return ctrl.Result{}, err
+	}
+
+	if !hasControllerOwner(machine) {
+		r.Log.Info("ignoring remediation of machine associated to node, since the machine has no controller owner", "node name", remediation.Name)
+		return ctrl.Result{}, nil
 	}
 
 	log.Info("reconciling", "node", remediation.Name, "associated machine", machine.GetName())
@@ -103,7 +102,6 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 }
 
 func (r *MachineDeletionRemediationReconciler) deleteMachineOfNode(ctx context.Context, machine *unstructured.Unstructured, nodeName string) error {
-	//delete the machine
 	if err := r.Client.Delete(ctx, machine); err != nil {
 		r.Log.Error(err, "failed to delete machine associated to node", "node name", nodeName)
 		return err
@@ -116,7 +114,7 @@ func (r *MachineDeletionRemediationReconciler) deleteMachineOfNode(ctx context.C
 
 	//verify machine is deleted
 	if err := r.Get(context.TODO(), key, machine); !apiErrors.IsNotFound(err) {
-		r.Log.Info("machine associated to node was not deleted probably due to a finalizer on the machine, note that the remediation is pending", "node name", nodeName)
+		r.Log.Info("machine associated to node was not deleted yet, probably due to a finalizer on the machine, note that the remediation is pending", "node name", nodeName)
 	}
 	return nil
 }

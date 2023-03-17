@@ -116,7 +116,11 @@ func (r *MachineDeletionRemediationReconciler) deleteMachineOfNode(ctx context.C
 
 	//verify machine is deleted
 	if err := r.Get(context.TODO(), key, machine); !apiErrors.IsNotFound(err) {
-		r.Log.Info("machine associated to node was not deleted yet, probably due to a finalizer on the machine, note that the remediation is pending", "node name", nodeName)
+		machinePhase, err := getMachineStatusPhase(machine)
+		if err != nil {
+			r.Log.Error(err, "could not get machine phase")
+		}
+		r.Log.Info("machine associated to node was not deleted yet, probably due to a finalizer on the machine", "machine status.phase", machinePhase)
 	}
 	return nil
 }
@@ -202,4 +206,25 @@ func extractNameAndNamespace(nameNamespace string, nodeName string) (string, str
 		return nameNamespaceSlice[1], nameNamespaceSlice[0], nil
 	}
 	return "", "", fmt.Errorf(invalidValueMachineAnnotationError, nodeName)
+}
+
+func getMachineStatusPhase(machine *unstructured.Unstructured) (string, error) {
+	phase := "unknown"
+
+	status, ok, err := unstructured.NestedMap(machine.Object, "status")
+	if err != nil {
+		return phase, fmt.Errorf("could not get Machine's status: error %v", err)
+	}
+	if !ok {
+		return phase, fmt.Errorf("Machine object does not have a status field")
+	}
+
+	phase, ok, err = unstructured.NestedString(status, "phase")
+	if err != nil {
+		return phase, fmt.Errorf("could not get Machine's status.phase: error %v", err)
+	}
+	if !ok {
+		return phase, fmt.Errorf("Machine object does not have a status.phase field")
+	}
+	return phase, nil
 }

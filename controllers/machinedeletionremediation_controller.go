@@ -81,19 +81,21 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 		r.Log.Error(err, "failed to fetch node", "node name", remediation.Name)
 		return ctrl.Result{}, err
 	}
+	log.Info("reconciling...")
 
 	var machine *unstructured.Unstructured
 	if machine, err = r.buildMachineFromNode(node); err != nil {
 		r.Log.Error(err, "failed to fetch machine of node", "node name", node.Name)
 		return ctrl.Result{}, err
 	}
+	log.Info("node-associated machine found", "machine", machine.GetName())
 
 	if !hasControllerOwner(machine) {
-		r.Log.Info("ignoring remediation of machine associated to node, since the machine has no controller owner", "node name", remediation.Name)
+		log.Info("ignoring remediation of machine associated to node, since the machine has no controller owner", "node name", remediation.Name)
 		return ctrl.Result{}, nil
 	}
 
-	log.Info("reconciling", "node", remediation.Name, "associated machine", machine.GetName())
+	log.Info("request machine deletion", "machine", machine.GetName())
 	if err := r.deleteMachineOfNode(ctx, machine, remediation.Name); err != nil {
 		return ctrl.Result{}, err
 	}

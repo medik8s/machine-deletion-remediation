@@ -23,8 +23,8 @@ import (
 
 	"github.com/go-logr/logr"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/api/core/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -71,9 +71,10 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 	log := r.Log.WithValues("machinedeletionremediation", req.NamespacedName)
 
 	//fetch the remediation
+	var err error
 	var remediation *v1alpha1.MachineDeletionRemediation
-	if remediation = r.getRemediation(ctx, req); remediation == nil {
-		return ctrl.Result{}, nil
+	if remediation, err = r.getRemediation(ctx, req); remediation == nil || err != nil {
+		return ctrl.Result{}, err
 	}
 
 	var machine *unstructured.Unstructured
@@ -114,7 +115,7 @@ func (r *MachineDeletionRemediationReconciler) deleteMachineOfNode(ctx context.C
 	}
 
 	//verify machine is deleted
-	if err := r.Get(context.TODO(), key, machine); !errors.IsNotFound(err) {
+	if err := r.Get(context.TODO(), key, machine); !apiErrors.IsNotFound(err) {
 		r.Log.Info("machine associated to node was not deleted probably due to a finalizer on the machine, note that the remediation is pending", "node name", nodeName)
 	}
 	return nil
@@ -137,16 +138,18 @@ func (r *MachineDeletionRemediationReconciler) SetupWithManager(mgr ctrl.Manager
 		Complete(r)
 }
 
-func (r *MachineDeletionRemediationReconciler) getRemediation(ctx context.Context, req ctrl.Request) *v1alpha1.MachineDeletionRemediation {
+func (r *MachineDeletionRemediationReconciler) getRemediation(ctx context.Context, req ctrl.Request) (*v1alpha1.MachineDeletionRemediation, error) {
 	remediation := new(v1alpha1.MachineDeletionRemediation)
 	key := client.ObjectKey{Name: req.Name, Namespace: req.Namespace}
 	if err := r.Client.Get(ctx, key, remediation); err != nil {
-		if !errors.IsNotFound(err) {
-			r.Log.Error(err, "error retrieving remediation in namespace", "remediation name", req.Name, "namespace", req.Namespace)
+		if apiErrors.IsNotFound(err) {
+			r.Log.Info("MDR already deleted, nothing to do")
+			return nil, nil
 		}
-		return nil
+		r.Log.Error(err, "error retrieving remediation in namespace", "remediation name", req.Name, "namespace", req.Namespace)
+		return nil, err
 	}
-	return remediation
+	return remediation, nil
 }
 
 func (r *MachineDeletionRemediationReconciler) getNodeFromMdr(mdr *v1alpha1.MachineDeletionRemediation) (*v1.Node, error) {

@@ -70,6 +70,8 @@ type MachineDeletionRemediationReconciler struct {
 func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("machinedeletionremediation", req.NamespacedName)
 
+	log.Info("reconciling...")
+
 	var err error
 	var remediation *v1alpha1.MachineDeletionRemediation
 	if remediation, err = r.getRemediation(ctx, req); remediation == nil || err != nil {
@@ -78,24 +80,23 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 
 	var node *v1.Node
 	if node, err = r.getNodeFromMdr(remediation); err != nil {
-		r.Log.Error(err, "failed to fetch node", "node name", remediation.Name)
 		return ctrl.Result{}, err
 	}
-	log.Info("reconciling...")
+
+	log.Info("MDR CR and affected Node found", "node", node.GetName())
 
 	var machine *unstructured.Unstructured
 	if machine, err = r.buildMachineFromNode(node); err != nil {
 		r.Log.Error(err, "failed to fetch machine of node", "node name", node.Name)
 		return ctrl.Result{}, err
 	}
-	log.Info("node-associated machine found", "machine", machine.GetName())
+	log.Info("node-associated machine found", "machine", machine.GetName(), "node name", node.Name)
 
 	if !hasControllerOwner(machine) {
-		log.Info("ignoring remediation of machine associated to node, since the machine has no controller owner", "node name", remediation.Name)
+		log.Info("ignoring remediation of machine associated to node, since the machine has no controller owner", "machine", machine.GetName(), "node name", remediation.Name)
 		return ctrl.Result{}, nil
 	}
 
-	log.Info("request machine deletion", "machine", machine.GetName())
 	if err := r.deleteMachineOfNode(ctx, machine, remediation.Name); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -163,6 +164,7 @@ func (r *MachineDeletionRemediationReconciler) getNodeFromMdr(mdr *v1alpha1.Mach
 	}
 
 	if err := r.Get(context.Background(), key, node); err != nil {
+		r.Log.Error(err, "failed to fetch node", "node name", mdr.Name)
 		return nil, err
 	}
 	return node, nil

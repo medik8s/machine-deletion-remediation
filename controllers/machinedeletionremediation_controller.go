@@ -116,13 +116,22 @@ func (r *MachineDeletionRemediationReconciler) deleteMachineOfNode(ctx context.C
 	}
 
 	//verify machine is deleted
-	if err := r.Get(context.TODO(), key, machine); !apiErrors.IsNotFound(err) {
-		machinePhase, err := getMachineStatusPhase(machine)
-		if err != nil {
-			r.Log.Error(err, "could not get machine phase")
+	if err := r.Get(ctx, key, machine); err != nil {
+		if apiErrors.IsNotFound(err) {
+			r.Log.Info("machine associated to node correctly deleted", "machine", key.Name, "node", nodeName)
+			return nil
 		}
-		r.Log.Info("machine associated to node was not deleted yet, probably due to a finalizer on the machine", "machine status.phase", machinePhase)
+		r.Log.Error(err, "unexpected error retrieving the node-associated machine after deletion request", "machine", key.Name, "node", nodeName)
+		return err
 	}
+
+	machinePhase, err := getMachineStatusPhase(machine)
+	if err != nil {
+		r.Log.Error(err, "could not get machine phase")
+		machinePhase = "unknown"
+	}
+	r.Log.Info("machine associated to node was not deleted yet, probably due to a finalizer on the machine", "machine", key.Name, "machine status.phase", machinePhase)
+
 	return nil
 }
 

@@ -211,22 +211,20 @@ func extractNameAndNamespace(nameNamespace string, nodeName string) (string, str
 }
 
 func getMachineStatusPhase(machine *unstructured.Unstructured) (string, error) {
-	phase := "unknown"
-
 	status, ok, err := unstructured.NestedMap(machine.Object, "status")
 	if err != nil {
-		return phase, fmt.Errorf("could not get Machine's status: error %v", err)
+		return "", fmt.Errorf("could not get Machine's status: error %w", err)
 	}
 	if !ok {
-		return phase, fmt.Errorf("Machine object does not have a status field")
+		return "", fmt.Errorf("Machine object does not have a status field")
 	}
 
-	phase, ok, err = unstructured.NestedString(status, "phase")
+	phase, ok, err := unstructured.NestedString(status, "phase")
 	if err != nil {
-		return phase, fmt.Errorf("could not get Machine's status.phase: error %v", err)
+		return "", fmt.Errorf("could not get Machine's status.phase: error %w", err)
 	}
 	if !ok {
-		return phase, fmt.Errorf("Machine object does not have a status.phase field")
+		return "", fmt.Errorf("Machine object does not have a status.phase field")
 	}
 	return phase, nil
 }

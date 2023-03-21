@@ -23,8 +23,8 @@ import (
 
 	"github.com/go-logr/logr"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/api/core/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -72,27 +72,29 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 
 	log.Info("reconciling...")
 
-	//fetch the remediation
+	var err error
 	var remediation *v1alpha1.MachineDeletionRemediation
-	if remediation = r.getRemediation(ctx, req); remediation == nil {
-		return ctrl.Result{}, nil
+	if remediation, err = r.getRemediation(ctx, req); remediation == nil || err != nil {
+		return ctrl.Result{}, err
 	}
 
-	var machine *unstructured.Unstructured
-	//Health check was done by NHC
-	if node, err := r.getNodeFromMdr(remediation); err == nil {
-		if machine, err = r.buildMachineFromNode(node); err != nil {
-			r.Log.Error(err, "failed to fetch machine of node", "node name", node.Name)
-			return ctrl.Result{}, err
-		}
-		if !hasControllerOwner(machine) {
-			r.Log.Info("ignoring remediation of machine associated to node, since the machine has no controller owner", "node name", remediation.Name)
-			return ctrl.Result{}, nil
-		}
-
-	} else { //Failed fetching the node
-		r.Log.Error(err, "failed to fetch node", "node name", remediation.Name)
+	var node *v1.Node
+	if node, err = r.getNodeFromMdr(remediation); err != nil {
 		return ctrl.Result{}, err
+	}
+
+	log.Info("MDR CR and affected Node found", "node", node.GetName())
+
+	var machine *unstructured.Unstructured
+	if machine, err = r.buildMachineFromNode(node); err != nil {
+		r.Log.Error(err, "failed to fetch machine of node", "node name", node.Name)
+		return ctrl.Result{}, err
+	}
+	log.Info("node-associated machine found", "machine", machine.GetName(), "node name", node.Name)
+
+	if !hasControllerOwner(machine) {
+		log.Info("ignoring remediation of node-associated machine: the machine has no controller owner", "machine", machine.GetName(), "node name", remediation.Name)
+		return ctrl.Result{}, nil
 	}
 
 	if err := r.deleteMachineOfNode(ctx, machine, remediation.Name); err != nil {
@@ -103,7 +105,6 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 }
 
 func (r *MachineDeletionRemediationReconciler) deleteMachineOfNode(ctx context.Context, machine *unstructured.Unstructured, nodeName string) error {
-	//delete the machine
 	if err := r.Client.Delete(ctx, machine); err != nil {
 		r.Log.Error(err, "failed to delete machine associated to node", "node name", nodeName)
 		return err
@@ -115,9 +116,22 @@ func (r *MachineDeletionRemediationReconciler) deleteMachineOfNode(ctx context.C
 	}
 
 	//verify machine is deleted
-	if err := r.Get(context.TODO(), key, machine); !errors.IsNotFound(err) {
-		r.Log.Info("machine associated to node was not deleted probably due to a finalizer on the machine, note that the remediation is pending", "node name", nodeName)
+	if err := r.Get(ctx, key, machine); err != nil {
+		if apiErrors.IsNotFound(err) {
+			r.Log.Info("node-associated machine correctly deleted", "machine", key.Name, "node", nodeName)
+			return nil
+		}
+		r.Log.Error(err, "unexpected error retrieving the node-associated machine after deletion request", "machine", key.Name, "node", nodeName)
+		return err
 	}
+
+	machinePhase, err := getMachineStatusPhase(machine)
+	if err != nil {
+		r.Log.Error(err, "could not get machine's phase")
+		machinePhase = "unknown"
+	}
+	r.Log.Info("node-associated machine was not deleted yet, probably due to a finalizer on the machine", "machine", key.Name, "machine status.phase", machinePhase)
+
 	return nil
 }
 
@@ -138,16 +152,18 @@ func (r *MachineDeletionRemediationReconciler) SetupWithManager(mgr ctrl.Manager
 		Complete(r)
 }
 
-func (r *MachineDeletionRemediationReconciler) getRemediation(ctx context.Context, req ctrl.Request) *v1alpha1.MachineDeletionRemediation {
+func (r *MachineDeletionRemediationReconciler) getRemediation(ctx context.Context, req ctrl.Request) (*v1alpha1.MachineDeletionRemediation, error) {
 	remediation := new(v1alpha1.MachineDeletionRemediation)
 	key := client.ObjectKey{Name: req.Name, Namespace: req.Namespace}
 	if err := r.Client.Get(ctx, key, remediation); err != nil {
-		if !errors.IsNotFound(err) {
-			r.Log.Error(err, "error retrieving remediation in namespace", "remediation name", req.Name, "namespace", req.Namespace)
+		if apiErrors.IsNotFound(err) {
+			r.Log.Info("MDR already deleted, nothing to do")
+			return nil, nil
 		}
-		return nil
+		r.Log.Error(err, "could not find remediation object in namespace", "remediation name", req.Name, "namespace", req.Namespace)
+		return nil, err
 	}
-	return remediation
+	return remediation, nil
 }
 
 func (r *MachineDeletionRemediationReconciler) getNodeFromMdr(mdr *v1alpha1.MachineDeletionRemediation) (*v1.Node, error) {
@@ -157,6 +173,7 @@ func (r *MachineDeletionRemediationReconciler) getNodeFromMdr(mdr *v1alpha1.Mach
 	}
 
 	if err := r.Get(context.Background(), key, node); err != nil {
+		r.Log.Error(err, "failed to fetch node", "node name", mdr.Name)
 		return nil, err
 	}
 	return node, nil
@@ -200,4 +217,23 @@ func extractNameAndNamespace(nameNamespace string, nodeName string) (string, str
 		return nameNamespaceSlice[1], nameNamespaceSlice[0], nil
 	}
 	return "", "", fmt.Errorf(invalidValueMachineAnnotationError, nodeName)
+}
+
+func getMachineStatusPhase(machine *unstructured.Unstructured) (string, error) {
+	status, ok, err := unstructured.NestedMap(machine.Object, "status")
+	if err != nil {
+		return "", fmt.Errorf("could not get Machine's status: error %w", err)
+	}
+	if !ok {
+		return "", fmt.Errorf("Machine object does not have a status field")
+	}
+
+	phase, ok, err := unstructured.NestedString(status, "phase")
+	if err != nil {
+		return "", fmt.Errorf("could not get Machine's status.phase: error %w", err)
+	}
+	if !ok {
+		return "", fmt.Errorf("Machine object does not have a status.phase field")
+	}
+	return phase, nil
 }

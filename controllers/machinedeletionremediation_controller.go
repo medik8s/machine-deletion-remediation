@@ -93,7 +93,7 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 	log.Info("node-associated machine found", "machine", machine.GetName(), "node name", node.Name)
 
 	if !hasControllerOwner(machine) {
-		log.Info("ignoring remediation of machine associated to node, since the machine has no controller owner", "machine", machine.GetName(), "node name", remediation.Name)
+		log.Info("ignoring remediation of node-associated machine: the machine has no controller owner", "machine", machine.GetName(), "node name", remediation.Name)
 		return ctrl.Result{}, nil
 	}
 
@@ -118,7 +118,7 @@ func (r *MachineDeletionRemediationReconciler) deleteMachineOfNode(ctx context.C
 	//verify machine is deleted
 	if err := r.Get(ctx, key, machine); err != nil {
 		if apiErrors.IsNotFound(err) {
-			r.Log.Info("machine associated to node correctly deleted", "machine", key.Name, "node", nodeName)
+			r.Log.Info("node-associated machine correctly deleted", "machine", key.Name, "node", nodeName)
 			return nil
 		}
 		r.Log.Error(err, "unexpected error retrieving the node-associated machine after deletion request", "machine", key.Name, "node", nodeName)
@@ -127,10 +127,10 @@ func (r *MachineDeletionRemediationReconciler) deleteMachineOfNode(ctx context.C
 
 	machinePhase, err := getMachineStatusPhase(machine)
 	if err != nil {
-		r.Log.Error(err, "could not get machine phase")
+		r.Log.Error(err, "could not get machine's phase")
 		machinePhase = "unknown"
 	}
-	r.Log.Info("machine associated to node was not deleted yet, probably due to a finalizer on the machine", "machine", key.Name, "machine status.phase", machinePhase)
+	r.Log.Info("node-associated machine was not deleted yet, probably due to a finalizer on the machine", "machine", key.Name, "machine status.phase", machinePhase)
 
 	return nil
 }
@@ -160,7 +160,7 @@ func (r *MachineDeletionRemediationReconciler) getRemediation(ctx context.Contex
 			r.Log.Info("MDR already deleted, nothing to do")
 			return nil, nil
 		}
-		r.Log.Error(err, "error retrieving remediation in namespace", "remediation name", req.Name, "namespace", req.Namespace)
+		r.Log.Error(err, "could not find remediation object in namespace", "remediation name", req.Name, "namespace", req.Namespace)
 		return nil, err
 	}
 	return remediation, nil

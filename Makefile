@@ -282,6 +282,11 @@ bundle-build: bundle bundle-update ## Build the bundle image.
 bundle-push: ## Push the bundle image.
 	$(MAKE) docker-push IMG=$(BUNDLE_IMG)
 
+# Run bundle image
+.PHONY: bundle-run
+bundle-run: operator-sdk
+	$(OPERATOR_SDK) -n openshift-operators run bundle $(BUNDLE_IMG)
+
 .PHONY: opm
 OPM_DIR = $(LOCALBIN)/opm
 OPM = $(OPM_DIR)/$(OPM_VERSION)/opm

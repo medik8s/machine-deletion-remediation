@@ -262,7 +262,7 @@ bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metada
 	$(OPERATOR_SDK) generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
-	$(OPERATOR_SDK) bundle validate ./bundle
+	$(MAKE) bundle-validate
 
 ##@ Bundle Creation Addition
 ## Some addition to bundle creation in the bundle
@@ -270,8 +270,12 @@ bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metada
 bundle-update: ## Update containerImage and createdAt
 	sed -r -i "s|containerImage: .*|containerImage: $(IMG)|;" ./bundle/manifests/$(OPERATOR_NAME).clusterserviceversion.yaml
 	sed -r -i "s|createdAt: .*|createdAt: \"`date '+%Y-%m-%d %T'`\"|;" ./bundle/manifests/$(OPERATOR_NAME).clusterserviceversion.yaml
-	$(OPERATOR_SDK) bundle validate ./bundle
+	$(MAKE) bundle-validate
 
+.PHONY: bundle-validate
+bundle-validate: operator-sdk ## Validate the bundle directory with additional validators (suite=operatorframework), such as Kubernetes deprecated APIs (https://kubernetes.io/docs/reference/using-api/deprecation-guide/) based on bundle.CSV.Spec.MinKubeVersion
+	$(OPERATOR_SDK) bundle validate ./bundle --select-optional suite=operatorframework
+	
 # Build the bundle image.
 .PHONY: bundle-build
 bundle-build: bundle bundle-update ## Build the bundle image.

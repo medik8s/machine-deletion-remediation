@@ -174,9 +174,9 @@ test-e2e: ## Run end to end tests
 	@test -n "${KUBECONFIG}" -o -r ${HOME}/.kube/config || (echo "Failed to find kubeconfig in ~/.kube/config or no KUBECONFIG set"; exit 1)
 	go test ./e2e -coverprofile cover.out -v -timeout 25m -ginkgo.vv
 
-# Build manager binary
-manager: generate fmt vet
-	go build -o bin/manager main.go
+
+manager: generate fmt vet ## Build manager binary
+	./hack/build.sh ./bin
 
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go

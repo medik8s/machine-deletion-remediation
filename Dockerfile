@@ -16,12 +16,15 @@ COPY go.sum go.sum
 
 # Copy the go source
 COPY main.go main.go
+COPY .git/ .git/
 COPY api/ api/
 COPY controllers/ controllers/
+COPY hack/ hack/
 COPY vendor/ vendor/
+COPY version/ version/
 
 # Build
-RUN GOFLAGS=-mod=vendor CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o manager main.go
+RUN ./hack/build.sh .
 
 # Use ubi8 micro as base image to package the manager binary
 FROM registry.access.redhat.com/ubi8/ubi-micro:latest

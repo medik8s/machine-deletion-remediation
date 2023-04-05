@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -65,170 +66,6 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 			isDeleteWorkerNodeMachine bool
 		)
 
-		Context("Sunny Flows", func() {
-			When("remediation does not exist", func() {
-				It("No machine is deleted", func() {
-					verifyMachineNotDeleted(workerNodeMachineName)
-					verifyMachineNotDeleted(masterNodeMachineName)
-				})
-				BeforeEach(func() {
-					underTest = createRemediation(phantomNode)
-				})
-
-			})
-
-			When("remediation associated machine has no owner ref", func() {
-				It("No machine is deleted", func() {
-					verifyMachineNotDeleted(workerNodeMachineName)
-					verifyMachineNotDeleted(masterNodeMachineName)
-				})
-
-				BeforeEach(func() {
-					underTest = createRemediation(masterNode)
-				})
-
-			})
-
-			When("remediation associated machine has owner ref without controller", func() {
-				It("No machine is deleted", func() {
-					verifyMachineNotDeleted(workerNodeMachineName)
-					verifyMachineNotDeleted(masterNodeMachineName)
-				})
-
-				BeforeEach(func() {
-					workerNodeMachine.OwnerReferences[0].Controller = nil
-					Expect(k8sClient.Update(context.Background(), workerNodeMachine)).ToNot(HaveOccurred())
-					underTest = createRemediation(workerNode)
-				})
-
-			})
-
-			When("remediation associated machine has owner ref with controller set to false", func() {
-				It("No machine is deleted", func() {
-					verifyMachineNotDeleted(workerNodeMachineName)
-					verifyMachineNotDeleted(masterNodeMachineName)
-				})
-
-				BeforeEach(func() {
-					controllerValue := false
-					workerNodeMachine.OwnerReferences[0].Controller = &controllerValue
-					Expect(k8sClient.Update(context.Background(), workerNodeMachine)).ToNot(HaveOccurred())
-					underTest = createRemediation(workerNode)
-				})
-
-			})
-
-			When("worker node remediation exist", func() {
-				It("worker machine is deleted", func() {
-					verifyMachineIsDeleted(workerNodeMachineName)
-					verifyMachineNotDeleted(masterNodeMachineName)
-
-					Expect(k8sClient.Get(context.Background(), client.ObjectKeyFromObject(underTest), underTest)).To(Succeed())
-					Expect(underTest.GetAnnotations()).ToNot(BeNil())
-				})
-
-				BeforeEach(func() {
-					isDeleteWorkerNodeMachine = false
-					underTest = createRemediation(workerNode)
-				})
-			})
-
-		})
-		Context("Rainy (Error) Flows", func() {
-			var (
-				reconcileError   error
-				reconcileRequest reconcile.Request
-				reconciler       MachineDeletionRemediationReconciler
-			)
-			When("remediation is not connected to a node", func() {
-				It("node not found error", func() {
-					Eventually(func() bool {
-						_, reconcileError = reconciler.Reconcile(context.Background(), reconcileRequest)
-						return errors.IsNotFound(reconcileError)
-					}).Should(BeTrue())
-				})
-
-				BeforeEach(func() {
-					underTest = createRemediation(phantomNode)
-				})
-			})
-
-			When("node does not have annotations", func() {
-				It("no annotations error", func() {
-					Eventually(func() bool {
-						_, reconcileError = reconciler.Reconcile(context.Background(), reconcileRequest)
-						return reconcileError != nil && reconcileError.Error() == fmt.Sprintf(noAnnotationsError, underTest.Name)
-					}).Should(BeTrue())
-
-				})
-
-				BeforeEach(func() {
-					//node is
-					underTest = createRemediation(masterNode)
-					masterNode.Annotations = nil
-					Expect(k8sClient.Update(context.Background(), masterNode)).ToNot(HaveOccurred())
-				})
-			})
-
-			When("node does not have machine annotation", func() {
-				It("no machine annotation error", func() {
-					Eventually(func() bool {
-						_, reconcileError = reconciler.Reconcile(context.Background(), reconcileRequest)
-						return reconcileError != nil && reconcileError.Error() == fmt.Sprintf(noMachineAnnotationError, underTest.Name)
-					}).Should(BeTrue())
-
-				})
-
-				BeforeEach(func() {
-					//node is
-					underTest = createRemediation(masterNode)
-					masterNode.Annotations[machineAnnotationOpenshift] = ""
-					Expect(k8sClient.Update(context.Background(), masterNode)).ToNot(HaveOccurred())
-				})
-			})
-
-			When("node's machine annotation has invalid value", func() {
-				It("failed to extract Name/Namespace from machine annotation error", func() {
-					Eventually(func() bool {
-						_, reconcileError = reconciler.Reconcile(context.Background(), reconcileRequest)
-						return reconcileError != nil && reconcileError.Error() == fmt.Sprintf(invalidValueMachineAnnotationError, underTest.Name)
-					}).Should(BeTrue())
-
-				})
-
-				BeforeEach(func() {
-					underTest = createRemediation(masterNode)
-					masterNode.Annotations[machineAnnotationOpenshift] = "Gibberish"
-					Expect(k8sClient.Update(context.Background(), masterNode)).ToNot(HaveOccurred())
-				})
-			})
-
-			When("node's machine annotation has incorrect value", func() {
-				It("failed to fetch machine error", func() {
-					Eventually(func() bool {
-						_, reconcileError = reconciler.Reconcile(context.Background(), reconcileRequest)
-						return errors.IsNotFound(reconcileError)
-					}).Should(BeTrue())
-
-				})
-
-				BeforeEach(func() {
-					underTest = createRemediation(masterNode)
-					masterNode.Annotations[machineAnnotationOpenshift] = "phantom-machine-namespace/phantom-machine-name"
-					Expect(k8sClient.Update(context.Background(), masterNode)).ToNot(HaveOccurred())
-				})
-			})
-
-			BeforeEach(func() {
-				reconciler = MachineDeletionRemediationReconciler{Client: k8sClient, Log: controllerruntime.Log, Scheme: scheme.Scheme}
-			})
-
-			JustBeforeEach(func() {
-				reconcileRequest = controllerruntime.Request{NamespacedName: types.NamespacedName{Name: underTest.Name, Namespace: defaultNamespace}}
-			})
-
-		})
-
 		BeforeEach(func() {
 			isDeleteWorkerNodeMachine = true
 			workerNodeMachine, masterNodeMachine = createWorkerMachine(workerNodeMachineName), createMachine(masterNodeMachineName)
@@ -252,6 +89,184 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 			if isDeleteWorkerNodeMachine {
 				Expect(k8sClient.Delete(context.Background(), workerNodeMachine)).ToNot(HaveOccurred())
 			}
+		})
+
+		Context("Sunny Flows", func() {
+			When("remediation does not exist", func() {
+				BeforeEach(func() {
+					underTest = createRemediation(phantomNode)
+				})
+
+				It("No machine is deleted", func() {
+					verifyMachineNotDeleted(workerNodeMachineName)
+					verifyMachineNotDeleted(masterNodeMachineName)
+				})
+			})
+
+			When("remediation associated machine has no owner ref", func() {
+				BeforeEach(func() {
+					underTest = createRemediation(masterNode)
+				})
+
+				It("No machine is deleted", func() {
+					verifyMachineNotDeleted(workerNodeMachineName)
+					verifyMachineNotDeleted(masterNodeMachineName)
+				})
+			})
+
+			When("remediation associated machine has owner ref without controller", func() {
+				BeforeEach(func() {
+					workerNodeMachine.OwnerReferences[0].Controller = nil
+					Expect(k8sClient.Update(context.Background(), workerNodeMachine)).ToNot(HaveOccurred())
+					underTest = createRemediation(workerNode)
+				})
+
+				It("No machine is deleted", func() {
+					verifyMachineNotDeleted(workerNodeMachineName)
+					verifyMachineNotDeleted(masterNodeMachineName)
+				})
+			})
+
+			When("remediation associated machine has owner ref with controller set to false", func() {
+				BeforeEach(func() {
+					controllerValue := false
+					workerNodeMachine.OwnerReferences[0].Controller = &controllerValue
+					Expect(k8sClient.Update(context.Background(), workerNodeMachine)).ToNot(HaveOccurred())
+					underTest = createRemediation(workerNode)
+				})
+
+				It("No machine is deleted", func() {
+					verifyMachineNotDeleted(workerNodeMachineName)
+					verifyMachineNotDeleted(masterNodeMachineName)
+				})
+			})
+
+			When("worker node remediation exist", func() {
+				BeforeEach(func() {
+					isDeleteWorkerNodeMachine = false
+					underTest = createRemediation(workerNode)
+				})
+				It("worker machine is deleted", func() {
+					verifyMachineIsDeleted(workerNodeMachineName)
+					verifyMachineNotDeleted(masterNodeMachineName)
+
+					Expect(k8sClient.Get(context.Background(), client.ObjectKeyFromObject(underTest), underTest)).To(Succeed())
+					Expect(underTest.GetAnnotations()).ToNot(BeNil())
+				})
+			})
+		})
+
+		Context("Rainy (Error) Flows", func() {
+			var (
+				reconcileError   error
+				reconcileRequest reconcile.Request
+				reconciler       MachineDeletionRemediationReconciler
+			)
+
+			BeforeEach(func() {
+				reconciler = MachineDeletionRemediationReconciler{Client: k8sClient, Log: controllerruntime.Log, Scheme: scheme.Scheme}
+			})
+
+			JustBeforeEach(func() {
+				reconcileRequest = controllerruntime.Request{NamespacedName: types.NamespacedName{Name: underTest.Name, Namespace: defaultNamespace}}
+			})
+
+			When("remediation is not connected to a node", func() {
+				BeforeEach(func() {
+					underTest = createRemediation(phantomNode)
+				})
+
+				It("node not found error", func() {
+					Eventually(func() bool {
+						_, reconcileError = reconciler.Reconcile(context.Background(), reconcileRequest)
+						return errors.IsNotFound(reconcileError)
+					}).Should(BeTrue())
+				})
+			})
+
+			When("node does not have annotations", func() {
+				BeforeEach(func() {
+					//node is
+					underTest = createRemediation(masterNode)
+					masterNode.Annotations = nil
+					Expect(k8sClient.Update(context.Background(), masterNode)).ToNot(HaveOccurred())
+				})
+
+				It("no annotations error", func() {
+					Eventually(func() bool {
+						_, reconcileError = reconciler.Reconcile(context.Background(), reconcileRequest)
+						return reconcileError != nil && reconcileError.Error() == fmt.Sprintf(noAnnotationsError, underTest.Name)
+					}).Should(BeTrue())
+
+				})
+			})
+
+			When("node does not have machine annotation", func() {
+				BeforeEach(func() {
+					//node is
+					underTest = createRemediation(masterNode)
+					masterNode.Annotations[machineAnnotationOpenshift] = ""
+					Expect(k8sClient.Update(context.Background(), masterNode)).ToNot(HaveOccurred())
+				})
+
+				It("no machine annotation error", func() {
+					Eventually(func() bool {
+						_, reconcileError = reconciler.Reconcile(context.Background(), reconcileRequest)
+						return reconcileError != nil && reconcileError.Error() == fmt.Sprintf(noMachineAnnotationError, underTest.Name)
+					}).Should(BeTrue())
+
+				})
+			})
+
+			When("node's machine annotation has invalid value", func() {
+				BeforeEach(func() {
+					underTest = createRemediation(masterNode)
+					masterNode.Annotations[machineAnnotationOpenshift] = "Gibberish"
+					Expect(k8sClient.Update(context.Background(), masterNode)).ToNot(HaveOccurred())
+				})
+
+				It("failed to extract Name/Namespace from machine annotation error", func() {
+					Eventually(func() bool {
+						_, reconcileError = reconciler.Reconcile(context.Background(), reconcileRequest)
+						return reconcileError != nil && reconcileError.Error() == fmt.Sprintf(invalidValueMachineAnnotationError, underTest.Name)
+					}).Should(BeTrue())
+
+				})
+			})
+
+			When("node's machine annotation has incorrect value", func() {
+				BeforeEach(func() {
+					underTest = createRemediation(masterNode)
+					masterNode.Annotations[machineAnnotationOpenshift] = "phantom-machine-namespace/phantom-machine-name"
+					Expect(k8sClient.Update(context.Background(), masterNode)).ToNot(HaveOccurred())
+				})
+
+				It("failed to fetch machine error", func() {
+					Eventually(func() bool {
+						_, reconcileError = reconciler.Reconcile(context.Background(), reconcileRequest)
+						return errors.IsNotFound(reconcileError)
+					}).Should(BeTrue())
+
+				})
+			})
+
+			When("machine associated to worker node fails deletion", func() {
+				BeforeEach(func() {
+					underTest = createRemediation(workerNode)
+					reconciler = MachineDeletionRemediationReconciler{Client: deleteFailClient{k8sClient}, Log: controllerruntime.Log, Scheme: scheme.Scheme}
+					isDeleteWorkerNodeMachine = false //Reconcile runs twice, first time is initiated automatically by Ginkgo framework without fake client - the machine is deleted than
+				})
+
+				It("returns the same delete failure error", func() {
+					Skip("Test affected by too many timeouts, skipping it until reworked")
+					Eventually(func() bool {
+						_ = k8sClient.Create(context.Background(), workerNodeMachine) //make sure worker machine will exist - it may be deleted by first run
+						_, reconcileError = reconciler.Reconcile(context.Background(), reconcileRequest)
+						return reconcileError != nil && reconcileError.Error() == mockDeleteFailMessage
+					}, 10*time.Second, 1*time.Second).Should(BeTrue())
+				})
+			})
+
 		})
 	})
 })

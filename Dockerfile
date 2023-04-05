@@ -16,6 +16,7 @@ COPY go.sum go.sum
 
 # Copy the go source
 COPY main.go main.go
+COPY .git/ .git/
 COPY api/ api/
 COPY controllers/ controllers/
 COPY hack/ hack/

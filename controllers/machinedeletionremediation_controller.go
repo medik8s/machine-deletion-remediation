@@ -92,7 +92,7 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 		r.Log.Error(err, "failed to fetch machine of node", "node name", node.Name)
 		return ctrl.Result{}, err
 	}
-	log.Info("node-associated machine found", "machine", machine.GetName(), "node name", node.Name)
+	log.Info("node-associated machine found", "node", node.Name, "machine", machine.GetName())
 
 	if !hasControllerOwner(machine) {
 		log.Info("ignoring remediation of node-associated machine: the machine has no controller owner", "machine", machine.GetName(), "node name", remediation.Name)

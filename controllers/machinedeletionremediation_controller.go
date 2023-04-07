@@ -209,12 +209,19 @@ func (r *MachineDeletionRemediationReconciler) verifyMachineIsDeleted(ctx contex
 			return false, err
 		}
 
+		message := "node-associated machine was not deleted yet"
+		machineFinalizersNo := len(machine.GetFinalizers())
+		if machineFinalizersNo > 0 {
+			message += fmt.Sprintf(", %d %s", machineFinalizersNo, "finalizer(s) on the machine")
+		}
+
 		machinePhase, err := getMachineStatusPhase(machine)
 		if err != nil {
 			r.Log.Error(err, "could not get machine's phase")
 			machinePhase = "unknown"
 		}
-		r.Log.Info("node-associated machine was not deleted yet, probably due to a finalizer on the machine", "node", nodeName, "machine", key.Name, "machine status.phase", machinePhase, "next check", pollTime)
+
+		r.Log.Info(message, "node", nodeName, "machine", key.Name, "machine status.phase", machinePhase, "next check", pollTime)
 		return false, nil
 	})
 }

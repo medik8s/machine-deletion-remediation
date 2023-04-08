@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/go-logr/logr"
 
@@ -27,6 +28,7 @@ import (
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -90,7 +92,7 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 		r.Log.Error(err, "failed to fetch machine of node", "node name", node.Name)
 		return ctrl.Result{}, err
 	}
-	log.Info("node-associated machine found", "machine", machine.GetName(), "node name", node.Name)
+	log.Info("node-associated machine found", "node", node.Name, "machine", machine.GetName())
 
 	if !hasControllerOwner(machine) {
 		log.Info("ignoring remediation of node-associated machine: the machine has no controller owner", "machine", machine.GetName(), "node name", remediation.Name)
@@ -101,6 +103,7 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 		return ctrl.Result{}, err
 	}
 
+	r.verifyMachineIsDeleted(ctx, machine, remediation.Name)
 	return ctrl.Result{}, nil
 }
 
@@ -109,29 +112,6 @@ func (r *MachineDeletionRemediationReconciler) deleteMachineOfNode(ctx context.C
 		r.Log.Error(err, "failed to delete machine associated to node", "node name", nodeName)
 		return err
 	}
-
-	key := client.ObjectKey{
-		Name:      machine.GetName(),
-		Namespace: machine.GetNamespace(),
-	}
-
-	//verify machine is deleted
-	if err := r.Get(ctx, key, machine); err != nil {
-		if apiErrors.IsNotFound(err) {
-			r.Log.Info("node-associated machine correctly deleted", "machine", key.Name, "node", nodeName)
-			return nil
-		}
-		r.Log.Error(err, "unexpected error retrieving the node-associated machine after deletion request", "machine", key.Name, "node", nodeName)
-		return err
-	}
-
-	machinePhase, err := getMachineStatusPhase(machine)
-	if err != nil {
-		r.Log.Error(err, "could not get machine's phase")
-		machinePhase = "unknown"
-	}
-	r.Log.Info("node-associated machine was not deleted yet, probably due to a finalizer on the machine", "machine", key.Name, "machine status.phase", machinePhase)
-
 	return nil
 }
 
@@ -210,6 +190,40 @@ func (r *MachineDeletionRemediationReconciler) buildMachineFromNode(node *v1.Nod
 		return nil, err
 	}
 	return machine, nil
+}
+
+func (r *MachineDeletionRemediationReconciler) verifyMachineIsDeleted(ctx context.Context, machine *unstructured.Unstructured, nodeName string) {
+	pollTime := 30 * time.Second
+	go wait.PollImmediateWithContext(ctx, pollTime, time.Hour, func(ctx context.Context) (bool, error) {
+		key := client.ObjectKey{
+			Name:      machine.GetName(),
+			Namespace: machine.GetNamespace(),
+		}
+
+		if err := r.Get(ctx, key, machine); err != nil {
+			if apiErrors.IsNotFound(err) {
+				r.Log.Info("node-associated machine correctly deleted", "node", nodeName, "machine", key.Name)
+				return true, nil
+			}
+			r.Log.Error(err, "unexpected error retrieving the node-associated machine after deletion request", "node", nodeName, "machine", key.Name)
+			return false, err
+		}
+
+		message := "node-associated machine was not deleted yet"
+		machineFinalizersNo := len(machine.GetFinalizers())
+		if machineFinalizersNo > 0 {
+			message += fmt.Sprintf(", %d %s", machineFinalizersNo, "finalizer(s) on the machine")
+		}
+
+		machinePhase, err := getMachineStatusPhase(machine)
+		if err != nil {
+			r.Log.Error(err, "could not get machine's phase")
+			machinePhase = "unknown"
+		}
+
+		r.Log.Info(message, "node", nodeName, "machine", key.Name, "machine status.phase", machinePhase, "next check", pollTime)
+		return false, nil
+	})
 }
 
 func extractNameAndNamespace(nameNamespace string, nodeName string) (string, string, error) {

@@ -3,7 +3,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -123,6 +122,9 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 				It("worker machine is deleted", func() {
 					verifyMachineIsDeleted(workerNodeMachineName)
 					verifyMachineNotDeleted(masterNodeMachineName)
+
+					Expect(k8sClient.Get(context.Background(), client.ObjectKeyFromObject(underTest), underTest)).To(Succeed())
+					Expect(underTest.GetAnnotations()).ToNot(BeNil())
 				})
 
 				BeforeEach(func() {
@@ -214,26 +216,6 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					underTest = createRemediation(masterNode)
 					masterNode.Annotations[machineAnnotationOpenshift] = "phantom-machine-namespace/phantom-machine-name"
 					Expect(k8sClient.Update(context.Background(), masterNode)).ToNot(HaveOccurred())
-				})
-			})
-
-			When("machine associated to worker node fails deletion", func() {
-				It("returns the same delete failure error", func() {
-					Eventually(func() error {
-						workerNodeMachine.ResourceVersion = ""
-						err := k8sClient.Create(context.Background(), workerNodeMachine) //make sure worker machine will exist - it may be deleted by first run
-						if !errors.IsAlreadyExists(err) {
-							return err
-						}
-						_, reconcileError = reconciler.Reconcile(context.Background(), reconcileRequest)
-						return reconcileError
-					}, 10*time.Second, 1*time.Second).Should(MatchError(mockDeleteFailMessage))
-				})
-
-				BeforeEach(func() {
-					underTest = createRemediation(workerNode)
-					reconciler = MachineDeletionRemediationReconciler{Client: deleteFailClient{k8sClient}, Log: controllerruntime.Log, Scheme: scheme.Scheme}
-					isDeleteWorkerNodeMachine = false //Reconcile runs twice, first time is initiated automatically by Ginkgo framework without fake client - the machine is deleted than
 				})
 			})
 

@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -40,11 +41,39 @@ import (
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
+// peekLogger allows to inspect operator's log for testing purpose.
+type peekLogger struct {
+	logs []string
+}
+
+func (p *peekLogger) Write(b []byte) (n int, err error) {
+	n, err = GinkgoWriter.Write(b)
+	if err != nil {
+		return n, err
+	}
+	p.logs = append(p.logs, string(b))
+	return n, err
+}
+
+func (p *peekLogger) Contains(s string) bool {
+	for _, log := range p.logs {
+		if strings.Contains(log, s) {
+			return true
+		}
+	}
+	return false
+}
+
+func (p *peekLogger) Clear() {
+	p.logs = make([]string, 0)
+}
+
 var (
 	k8sClient client.Client
 	testEnv   *envtest.Environment
 	ctx       context.Context
 	cancel    context.CancelFunc
+	plogs     *peekLogger
 )
 
 func TestAPIs(t *testing.T) {
@@ -54,7 +83,8 @@ func TestAPIs(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+	plogs = &peekLogger{logs: make([]string, 0)}
+	logf.SetLogger(zap.New(zap.WriteTo(plogs), zap.UseDevMode(true)))
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{

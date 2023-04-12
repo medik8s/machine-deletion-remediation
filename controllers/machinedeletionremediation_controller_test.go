@@ -67,6 +67,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 		)
 
 		BeforeEach(func() {
+			plogs.Clear()
 			isDeleteWorkerNodeMachine = true
 			workerNodeMachine, masterNodeMachine = createWorkerMachine(workerNodeMachineName), createMachine(masterNodeMachineName)
 			workerNode, masterNode, phantomNode = createNodeWithMachine(workerNodeName, workerNodeMachine), createNodeWithMachine(masterNodeName, masterNodeMachine), createNode(noneExistingNodeName)

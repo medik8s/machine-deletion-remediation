@@ -48,6 +48,8 @@ const (
 	noMachineAnnotationError           = "failed to find openshift machine annotation on node name: %s"
 	invalidValueMachineAnnotationError = "failed to extract Machine Name and Machine Namespace from machine annotation on the node for node name: %s"
 	failedToDeleteMachineError         = "failed to delete machine of node name: %s"
+	noNodeFoundError                   = "failed to fetch node"
+	noMachineFoundError                = "failed to fetch machine of node"
 )
 
 // MachineDeletionRemediationReconciler reconciles a MachineDeletionRemediation object
@@ -115,7 +117,7 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 
 	var machine *unstructured.Unstructured
 	if machine, err = r.buildMachineFromNode(node); err != nil {
-		r.Log.Error(err, "failed to fetch machine of node", "node name", node.Name)
+		r.Log.Error(err, noMachineFoundError, "node name", node.Name)
 		return ctrl.Result{}, err
 	}
 
@@ -186,7 +188,7 @@ func (r *MachineDeletionRemediationReconciler) getNodeFromMdr(mdr *v1alpha1.Mach
 	}
 
 	if err := r.Get(context.Background(), key, node); err != nil {
-		r.Log.Error(err, "failed to fetch node", "node name", mdr.Name)
+		r.Log.Error(err, noNodeFoundError, "node name", mdr.Name)
 		return nil, err
 	}
 	return node, nil

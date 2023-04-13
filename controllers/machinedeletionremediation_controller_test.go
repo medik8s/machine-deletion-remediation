@@ -11,7 +11,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -158,20 +157,6 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 		})
 
 		Context("Rainy (Error) Flows", func() {
-			var (
-				reconcileError   error
-				reconcileRequest reconcile.Request
-				reconciler       MachineDeletionRemediationReconciler
-			)
-
-			BeforeEach(func() {
-				reconciler = MachineDeletionRemediationReconciler{Client: k8sClient, Log: controllerruntime.Log, Scheme: scheme.Scheme}
-			})
-
-			JustBeforeEach(func() {
-				reconcileRequest = controllerruntime.Request{NamespacedName: types.NamespacedName{Name: underTest.Name, Namespace: defaultNamespace}}
-			})
-
 			When("remediation is not connected to a node", func() {
 				BeforeEach(func() {
 					underTest = createRemediation(phantomNode)
@@ -179,15 +164,13 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 				It("node not found error", func() {
 					Eventually(func() bool {
-						_, reconcileError = reconciler.Reconcile(context.Background(), reconcileRequest)
-						return errors.IsNotFound(reconcileError)
-					}).Should(BeTrue())
+						return plogs.Contains(noNodeFoundError)
+					}, 30*time.Second, 1*time.Second).Should(BeTrue())
 				})
 			})
 
 			When("node does not have annotations", func() {
 				BeforeEach(func() {
-					//node is
 					underTest = createRemediation(masterNode)
 					masterNode.Annotations = nil
 					Expect(k8sClient.Update(context.Background(), masterNode)).ToNot(HaveOccurred())
@@ -195,16 +178,13 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 				It("no annotations error", func() {
 					Eventually(func() bool {
-						_, reconcileError = reconciler.Reconcile(context.Background(), reconcileRequest)
-						return reconcileError != nil && reconcileError.Error() == fmt.Sprintf(noAnnotationsError, underTest.Name)
-					}).Should(BeTrue())
-
+						return plogs.Contains(fmt.Sprintf(noAnnotationsError, underTest.Name))
+					}, 30*time.Second, 1*time.Second).Should(BeTrue())
 				})
 			})
 
 			When("node does not have machine annotation", func() {
 				BeforeEach(func() {
-					//node is
 					underTest = createRemediation(masterNode)
 					masterNode.Annotations[machineAnnotationOpenshift] = ""
 					Expect(k8sClient.Update(context.Background(), masterNode)).ToNot(HaveOccurred())
@@ -212,10 +192,8 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 				It("no machine annotation error", func() {
 					Eventually(func() bool {
-						_, reconcileError = reconciler.Reconcile(context.Background(), reconcileRequest)
-						return reconcileError != nil && reconcileError.Error() == fmt.Sprintf(noMachineAnnotationError, underTest.Name)
-					}).Should(BeTrue())
-
+						return plogs.Contains(fmt.Sprintf(noMachineAnnotationError, underTest.Name))
+					}, 30*time.Second, 1*time.Second).Should(BeTrue())
 				})
 			})
 
@@ -228,10 +206,8 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 				It("failed to extract Name/Namespace from machine annotation error", func() {
 					Eventually(func() bool {
-						_, reconcileError = reconciler.Reconcile(context.Background(), reconcileRequest)
-						return reconcileError != nil && reconcileError.Error() == fmt.Sprintf(invalidValueMachineAnnotationError, underTest.Name)
-					}).Should(BeTrue())
-
+						return plogs.Contains(fmt.Sprintf(invalidValueMachineAnnotationError, underTest.Name))
+					}, 30*time.Second, 1*time.Second).Should(BeTrue())
 				})
 			})
 
@@ -244,14 +220,17 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 				It("failed to fetch machine error", func() {
 					Eventually(func() bool {
-						_, reconcileError = reconciler.Reconcile(context.Background(), reconcileRequest)
-						return errors.IsNotFound(reconcileError)
-					}).Should(BeTrue())
-
+						return plogs.Contains(noMachineFoundError)
+					}, 30*time.Second, 1*time.Second).Should(BeTrue())
 				})
 			})
 
 			When("machine associated to worker node fails deletion", func() {
+				var (
+					reconcileError   error
+					reconcileRequest reconcile.Request
+					reconciler       MachineDeletionRemediationReconciler
+				)
 				BeforeEach(func() {
 					underTest = createRemediation(workerNode)
 					reconciler = MachineDeletionRemediationReconciler{Client: deleteFailClient{k8sClient}, Log: controllerruntime.Log, Scheme: scheme.Scheme}

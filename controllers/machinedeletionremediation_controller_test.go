@@ -11,10 +11,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/scheme"
-	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 
@@ -226,24 +223,15 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 			})
 
 			When("machine associated to worker node fails deletion", func() {
-				var (
-					reconcileError   error
-					reconcileRequest reconcile.Request
-					reconciler       MachineDeletionRemediationReconciler
-				)
 				BeforeEach(func() {
+					cclient.onDeleteError = fmt.Errorf(mockDeleteFailMessage)
 					underTest = createRemediation(workerNode)
-					reconciler = MachineDeletionRemediationReconciler{Client: deleteFailClient{k8sClient}, Log: controllerruntime.Log, Scheme: scheme.Scheme}
-					isDeleteWorkerNodeMachine = false //Reconcile runs twice, first time is initiated automatically by Ginkgo framework without fake client - the machine is deleted than
 				})
 
 				It("returns the same delete failure error", func() {
-					Skip("Test affected by too many timeouts, skipping it until reworked")
 					Eventually(func() bool {
-						_ = k8sClient.Create(context.Background(), workerNodeMachine) //make sure worker machine will exist - it may be deleted by first run
-						_, reconcileError = reconciler.Reconcile(context.Background(), reconcileRequest)
-						return reconcileError != nil && reconcileError.Error() == mockDeleteFailMessage
-					}, 10*time.Second, 1*time.Second).Should(BeTrue())
+						return plogs.Contains(mockDeleteFailMessage)
+					}, 30*time.Second, 1*time.Second).Should(BeTrue())
 				})
 			})
 

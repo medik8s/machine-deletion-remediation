@@ -68,7 +68,21 @@ func (p *peekLogger) Clear() {
 	p.logs = make([]string, 0)
 }
 
+// customClient is a Client that can simulate errors
+type customClient struct {
+	client.Client
+	onDeleteError error
+}
+
+func (c *customClient) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
+	if c.onDeleteError != nil {
+		return c.onDeleteError
+	}
+	return c.Client.Delete(ctx, obj, opts...)
+}
+
 var (
+	cclient   customClient
 	k8sClient client.Client
 	testEnv   *envtest.Environment
 	ctx       context.Context
@@ -112,8 +126,13 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
+	k8sClient = k8sManager.GetClient()
+	Expect(k8sClient).ToNot(BeNil())
+
+	cclient = customClient{Client: k8sClient}
+
 	err = (&MachineDeletionRemediationReconciler{
-		Client: k8sManager.GetClient(),
+		Client: &cclient,
 		Log:    ctrl.Log.WithName("controllers").WithName("machine-deletion-controller"),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
@@ -125,9 +144,7 @@ var _ = BeforeSuite(func() {
 		Expect(err).ToNot(HaveOccurred())
 	}()
 
-	k8sClient = k8sManager.GetClient()
-	Expect(k8sClient).ToNot(BeNil())
-	v1beta1.AddToScheme(k8sClient.Scheme())
+	v1beta1.AddToScheme(cclient.Scheme())
 })
 
 var _ = AfterSuite(func() {

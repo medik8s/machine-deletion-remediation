@@ -267,9 +267,11 @@ bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metada
 ##@ Bundle Creation Addition
 ## Some addition to bundle creation in the bundle
 .PHONY: bundle-update
+export CSV="./bundle/manifests/$(OPERATOR_NAME).clusterserviceversion.yaml"
 bundle-update: ## Update containerImage and createdAt
-	sed -r -i "s|containerImage: .*|containerImage: $(IMG)|;" ./bundle/manifests/$(OPERATOR_NAME).clusterserviceversion.yaml
-	sed -r -i "s|createdAt: .*|createdAt: \"`date '+%Y-%m-%d %T'`\"|;" ./bundle/manifests/$(OPERATOR_NAME).clusterserviceversion.yaml
+	sed -r -i "s|containerImage: .*|containerImage: $(IMG)|;" ${CSV}
+	sed -r -i "s|createdAt: .*|createdAt: \"`date '+%Y-%m-%d %T'`\"|;" ${CSV}
+	sed -r -i "s|displayName: Machine Deletion Remediation operator.*|displayName: Machine Deletion Remediation operator - Community Edition|;" ${CSV}
 	$(MAKE) bundle-validate
 
 .PHONY: bundle-validate

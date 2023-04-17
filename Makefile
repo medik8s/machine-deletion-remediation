@@ -267,10 +267,14 @@ bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metada
 ##@ Bundle Creation Addition
 ## Some addition to bundle creation in the bundle
 .PHONY: bundle-update
+DEFAULT_ICON_BASE64 := $(shell base64 --wrap=0 ./config/assets/medik8s_blue_icon.png)
+export ICON_BASE64 ?= ${DEFAULT_ICON_BASE64}
 export CSV="./bundle/manifests/$(OPERATOR_NAME).clusterserviceversion.yaml"
-bundle-update: ## Update containerImage and createdAt
+
+bundle-update: ## Update containerImage, createdAt, icon, and displayName fields in the bundle's CSV, then validate the bundle directory
 	sed -r -i "s|containerImage: .*|containerImage: $(IMG)|;" ${CSV}
 	sed -r -i "s|createdAt: .*|createdAt: \"`date '+%Y-%m-%d %T'`\"|;" ${CSV}
+	sed -r -i "s|base64data:.*|base64data: ${ICON_BASE64}|;" ${BUNDLE_CSV}
 	sed -r -i "s|displayName: Machine Deletion Remediation operator.*|displayName: Machine Deletion Remediation operator - Community Edition|;" ${CSV}
 	$(MAKE) bundle-validate
 

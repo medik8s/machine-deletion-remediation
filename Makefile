@@ -266,22 +266,26 @@ bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metada
 
 ##@ Bundle Creation Addition
 ## Some addition to bundle creation in the bundle
-.PHONY: bundle-update
 DEFAULT_ICON_BASE64 := $(shell base64 --wrap=0 ./config/assets/medik8s_blue_icon.png)
 export ICON_BASE64 ?= ${DEFAULT_ICON_BASE64}
 export CSV="./bundle/manifests/$(OPERATOR_NAME).clusterserviceversion.yaml"
 
-bundle-update: ## Update containerImage, createdAt, icon, and displayName fields in the bundle's CSV, then validate the bundle directory
+.PHONY: bundle-update
+bundle-update: ## Update containerImage, createdAt, and icon fields in the bundle's CSV, then validate the bundle directory
 	sed -r -i "s|containerImage: .*|containerImage: $(IMG)|;" ${CSV}
 	sed -r -i "s|createdAt: .*|createdAt: \"`date '+%Y-%m-%d %T'`\"|;" ${CSV}
-	sed -r -i "s|base64data:.*|base64data: ${ICON_BASE64}|;" ${BUNDLE_CSV}
-	sed -r -i "s|displayName: Machine Deletion Remediation operator.*|displayName: Machine Deletion Remediation operator - Community Edition|;" ${CSV}
+	sed -r -i "s|base64data:.*|base64data: ${ICON_BASE64}|;" ${CSV}
 	$(MAKE) bundle-validate
+
+.PHONY: bundle-community
+bundle-community: ## Update displayName field in the bundle's CSV
+	sed -r -i "s|displayName: Machine Deletion Remediation operator.*|displayName: Machine Deletion Remediation Operator - Community Edition|;" ${CSV}
+	$(MAKE) bundle-update
 
 .PHONY: bundle-validate
 bundle-validate: operator-sdk ## Validate the bundle directory with additional validators (suite=operatorframework), such as Kubernetes deprecated APIs (https://kubernetes.io/docs/reference/using-api/deprecation-guide/) based on bundle.CSV.Spec.MinKubeVersion
 	$(OPERATOR_SDK) bundle validate ./bundle --select-optional suite=operatorframework
-	
+
 # Build the bundle image.
 .PHONY: bundle-build
 bundle-build: bundle bundle-update ## Build the bundle image.

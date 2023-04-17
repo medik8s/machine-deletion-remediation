@@ -60,8 +60,8 @@ spec:
     see https://github.com/medik8s/machine-deletion-remediation#readme for configuration examples.
   displayName: Machine Deletion Remediation operator
   icon:
-  - base64data: ""
-    mediatype: ""
+  - base64data: base64EncodedIcon
+    mediatype: image/png
   install:
     spec:
       deployments: null

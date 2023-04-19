@@ -43,6 +43,9 @@ const (
 	machineSetKind             = "MachineSet"
 	// MachineNameNamespaceAnnotation contains to-be-deleted Machine's Name and Namespace
 	MachineNameNamespaceAnnotation = "machine-deletion-remediation.medik8s.io/machineNameNamespace"
+	// Infos
+	postponedMachineDeletionInfo  = "node-associated machine was not deleted yet"
+	successfulMachineDeletionInfo = "node-associated machine correctly deleted"
 	//Errors
 	noAnnotationsError                 = "failed to find machine annotation on node name: %s"
 	noMachineAnnotationError           = "failed to find openshift machine annotation on node name: %s"
@@ -238,7 +241,7 @@ func (r *MachineDeletionRemediationReconciler) verifyMachineIsDeleted(ctx contex
 	machine.SetAPIVersion(v1beta1.SchemeGroupVersion.String())
 	if err := r.Get(ctx, key, machine); err != nil {
 		if apiErrors.IsNotFound(err) {
-			r.Log.Info("node-associated machine correctly deleted", "node", nodeName, "machine", machineName)
+			r.Log.Info(successfulMachineDeletionInfo, "node", nodeName, "machine", machineName)
 			return true, nil
 		}
 		r.Log.Error(err, "unexpected error retrieving the node-associated machine after deletion request", "node", nodeName, "machine", key.Name)
@@ -251,7 +254,7 @@ func (r *MachineDeletionRemediationReconciler) verifyMachineIsDeleted(ctx contex
 		machinePhase = "unknown"
 	}
 
-	r.Log.Info("node-associated machine was not deleted yet", "node", nodeName, "machine", machineName, "machine status.phase", machinePhase)
+	r.Log.Info(postponedMachineDeletionInfo, "node", nodeName, "machine", machineName, "machine status.phase", machinePhase)
 	return false, nil
 }
 

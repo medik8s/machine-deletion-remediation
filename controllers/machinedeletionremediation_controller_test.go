@@ -305,14 +305,6 @@ func verifyMachineIsDeleted(machineName string) {
 	}).Should(BeTrue())
 }
 
-type deleteFailClient struct {
-	client.Client
-}
-
-func (deleteFailClient) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
-	return fmt.Errorf(mockDeleteFailMessage)
-}
-
 func deleteIgnoreNotFound() func(ctx context.Context, obj client.Object) error {
 	return func(ctx context.Context, obj client.Object) error {
 		if err := k8sClient.Delete(ctx, obj); err != nil && !errors.IsNotFound(err) {

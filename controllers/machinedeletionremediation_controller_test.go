@@ -40,13 +40,8 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 			underTest = &v1alpha1.MachineDeletionRemediation{
 				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: defaultNamespace},
 			}
-			err := k8sClient.Create(context.Background(), underTest)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		AfterEach(func() {
-			err := k8sClient.Delete(context.Background(), underTest)
-			Expect(err).NotTo(HaveOccurred())
+			DeferCleanup(k8sClient.Delete, underTest)
+			Expect(k8sClient.Create(context.Background(), underTest)).To(Succeed())
 		})
 
 		When("creating a resource", func() {
@@ -58,34 +53,24 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 	})
 
 	Context("Reconciliation", func() {
-		var (
-			isDeleteWorkerNodeMachine bool
-		)
-
 		BeforeEach(func() {
 			plogs.Clear()
-			isDeleteWorkerNodeMachine = true
 			workerNodeMachine, masterNodeMachine = createWorkerMachine(workerNodeMachineName), createMachine(masterNodeMachineName)
 			workerNode, masterNode, phantomNode = createNodeWithMachine(workerNodeName, workerNodeMachine), createNodeWithMachine(masterNodeName, masterNodeMachine), createNode(noneExistingNodeName)
 
-			Expect(k8sClient.Create(context.Background(), masterNode)).ToNot(HaveOccurred())
-			Expect(k8sClient.Create(context.Background(), workerNode)).ToNot(HaveOccurred())
-			Expect(k8sClient.Create(context.Background(), masterNodeMachine)).ToNot(HaveOccurred())
-			Expect(k8sClient.Create(context.Background(), workerNodeMachine)).ToNot(HaveOccurred())
+			DeferCleanup(k8sClient.Delete, masterNode)
+			DeferCleanup(k8sClient.Delete, workerNode)
+			DeferCleanup(k8sClient.Delete, masterNodeMachine)
+			DeferCleanup(deleteIgnoreNotFound(), workerNodeMachine)
+			Expect(k8sClient.Create(context.Background(), masterNode)).To(Succeed())
+			Expect(k8sClient.Create(context.Background(), workerNode)).To(Succeed())
+			Expect(k8sClient.Create(context.Background(), masterNodeMachine)).To(Succeed())
+			Expect(k8sClient.Create(context.Background(), workerNodeMachine)).To(Succeed())
 		})
 
 		JustBeforeEach(func() {
-			Expect(k8sClient.Create(context.Background(), underTest)).ToNot(HaveOccurred())
-		})
-
-		AfterEach(func() {
-			Expect(k8sClient.Delete(context.Background(), masterNode)).ToNot(HaveOccurred())
-			Expect(k8sClient.Delete(context.Background(), workerNode)).ToNot(HaveOccurred())
-			Expect(k8sClient.Delete(context.Background(), masterNodeMachine)).ToNot(HaveOccurred())
-			Expect(k8sClient.Delete(context.Background(), underTest)).ToNot(HaveOccurred())
-			if isDeleteWorkerNodeMachine {
-				Expect(k8sClient.Delete(context.Background(), workerNodeMachine)).ToNot(HaveOccurred())
-			}
+			DeferCleanup(k8sClient.Delete, underTest)
+			Expect(k8sClient.Create(context.Background(), underTest)).To(Succeed())
 		})
 
 		Context("Sunny Flows", func() {
@@ -140,7 +125,6 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 			When("worker node remediation exist", func() {
 				BeforeEach(func() {
-					isDeleteWorkerNodeMachine = false
 					underTest = createRemediation(workerNode)
 				})
 				It("worker machine is deleted", func() {
@@ -165,7 +149,6 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 					// Mock a postponed machine deletion
 					Expect(k8sClient.Delete(context.Background(), workerNodeMachine)).ToNot(HaveOccurred())
-					isDeleteWorkerNodeMachine = false
 
 					Eventually(func() bool {
 						return plogs.Contains(successfulMachineDeletionInfo)
@@ -328,4 +311,13 @@ type deleteFailClient struct {
 
 func (deleteFailClient) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
 	return fmt.Errorf(mockDeleteFailMessage)
+}
+
+func deleteIgnoreNotFound() func(ctx context.Context, obj client.Object) error {
+	return func(ctx context.Context, obj client.Object) error {
+		if err := k8sClient.Delete(ctx, obj); err != nil && !errors.IsNotFound(err) {
+			return err
+		}
+		return nil
+	}
 }

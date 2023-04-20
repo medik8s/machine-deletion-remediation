@@ -264,7 +264,9 @@ spec:
   - mdr
   links:
   - name: Machine Deletion Remediation
-    url: https://machine-deletion-remediation.domain
+    url: https://medik8s.io
+  - name: Source Code
+    url: https://github.com/medik8s/machine-deletion-remediation
   maintainers:
   - email: medik8s@googlegroups.com
     name: Medik8s Team

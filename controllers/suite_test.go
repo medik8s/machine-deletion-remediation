@@ -41,6 +41,15 @@ import (
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
+var (
+	cclient   customClient
+	k8sClient client.Client
+	testEnv   *envtest.Environment
+	ctx       context.Context
+	cancel    context.CancelFunc
+	plogs     *peekLogger
+)
+
 // peekLogger allows to inspect operator's log for testing purpose.
 type peekLogger struct {
 	logs []string
@@ -80,15 +89,6 @@ func (c *customClient) Delete(ctx context.Context, obj client.Object, opts ...cl
 	}
 	return c.Client.Delete(ctx, obj, opts...)
 }
-
-var (
-	cclient   customClient
-	k8sClient client.Client
-	testEnv   *envtest.Environment
-	ctx       context.Context
-	cancel    context.CancelFunc
-	plogs     *peekLogger
-)
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)

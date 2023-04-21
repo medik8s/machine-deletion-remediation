@@ -43,11 +43,16 @@ const (
 	machineSetKind             = "MachineSet"
 	// MachineNameNamespaceAnnotation contains to-be-deleted Machine's Name and Namespace
 	MachineNameNamespaceAnnotation = "machine-deletion-remediation.medik8s.io/machineNameNamespace"
+	// Infos
+	postponedMachineDeletionInfo  = "node-associated machine was not deleted yet"
+	successfulMachineDeletionInfo = "node-associated machine correctly deleted"
 	//Errors
 	noAnnotationsError                 = "failed to find machine annotation on node name: %s"
 	noMachineAnnotationError           = "failed to find openshift machine annotation on node name: %s"
 	invalidValueMachineAnnotationError = "failed to extract Machine Name and Machine Namespace from machine annotation on the node for node name: %s"
 	failedToDeleteMachineError         = "failed to delete machine of node name: %s"
+	noNodeFoundError                   = "failed to fetch node"
+	noMachineFoundError                = "failed to fetch machine of node"
 )
 
 // MachineDeletionRemediationReconciler reconciles a MachineDeletionRemediation object
@@ -115,7 +120,7 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 
 	var machine *unstructured.Unstructured
 	if machine, err = r.buildMachineFromNode(node); err != nil {
-		r.Log.Error(err, "failed to fetch machine of node", "node name", node.Name)
+		r.Log.Error(err, noMachineFoundError, "node name", node.Name)
 		return ctrl.Result{}, err
 	}
 
@@ -186,7 +191,7 @@ func (r *MachineDeletionRemediationReconciler) getNodeFromMdr(mdr *v1alpha1.Mach
 	}
 
 	if err := r.Get(context.Background(), key, node); err != nil {
-		r.Log.Error(err, "failed to fetch node", "node name", mdr.Name)
+		r.Log.Error(err, noNodeFoundError, "node name", mdr.Name)
 		return nil, err
 	}
 	return node, nil
@@ -236,7 +241,7 @@ func (r *MachineDeletionRemediationReconciler) verifyMachineIsDeleted(ctx contex
 	machine.SetAPIVersion(v1beta1.SchemeGroupVersion.String())
 	if err := r.Get(ctx, key, machine); err != nil {
 		if apiErrors.IsNotFound(err) {
-			r.Log.Info("node-associated machine correctly deleted", "node", nodeName, "machine", machineName)
+			r.Log.Info(successfulMachineDeletionInfo, "node", nodeName, "machine", machineName)
 			return true, nil
 		}
 		r.Log.Error(err, "unexpected error retrieving the node-associated machine after deletion request", "node", nodeName, "machine", key.Name)
@@ -249,7 +254,7 @@ func (r *MachineDeletionRemediationReconciler) verifyMachineIsDeleted(ctx contex
 		machinePhase = "unknown"
 	}
 
-	r.Log.Info("node-associated machine was not deleted yet", "node", nodeName, "machine", machineName, "machine status.phase", machinePhase)
+	r.Log.Info(postponedMachineDeletionInfo, "node", nodeName, "machine", machineName, "machine status.phase", machinePhase)
 	return false, nil
 }
 

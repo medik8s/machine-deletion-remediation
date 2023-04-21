@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -41,11 +42,53 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 var (
+	cclient   customClient
 	k8sClient client.Client
 	testEnv   *envtest.Environment
 	ctx       context.Context
 	cancel    context.CancelFunc
+	plogs     *peekLogger
 )
+
+// peekLogger allows to inspect operator's log for testing purpose.
+type peekLogger struct {
+	logs []string
+}
+
+func (p *peekLogger) Write(b []byte) (n int, err error) {
+	n, err = GinkgoWriter.Write(b)
+	if err != nil {
+		return n, err
+	}
+	p.logs = append(p.logs, string(b))
+	return n, err
+}
+
+func (p *peekLogger) Contains(s string) bool {
+	for _, log := range p.logs {
+		if strings.Contains(log, s) {
+			return true
+		}
+	}
+	return false
+}
+
+func (p *peekLogger) Clear() {
+	p.logs = make([]string, 0)
+}
+
+// customClient is a Client that can simulate errors
+type customClient struct {
+	client.Client
+	onDeleteError error
+}
+
+func (c *customClient) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
+	if c.onDeleteError != nil {
+		return c.onDeleteError
+	}
+	return c.Client.Delete(ctx, obj, opts...)
+}
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -54,7 +97,8 @@ func TestAPIs(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+	plogs = &peekLogger{logs: make([]string, 0)}
+	logf.SetLogger(zap.New(zap.WriteTo(plogs), zap.UseDevMode(true)))
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
@@ -82,8 +126,13 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
+	k8sClient = k8sManager.GetClient()
+	Expect(k8sClient).ToNot(BeNil())
+
+	cclient = customClient{Client: k8sClient}
+
 	err = (&MachineDeletionRemediationReconciler{
-		Client: k8sManager.GetClient(),
+		Client: &cclient,
 		Log:    ctrl.Log.WithName("controllers").WithName("machine-deletion-controller"),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
@@ -95,9 +144,7 @@ var _ = BeforeSuite(func() {
 		Expect(err).ToNot(HaveOccurred())
 	}()
 
-	k8sClient = k8sManager.GetClient()
-	Expect(k8sClient).ToNot(BeNil())
-	v1beta1.AddToScheme(k8sClient.Scheme())
+	v1beta1.AddToScheme(cclient.Scheme())
 })
 
 var _ = AfterSuite(func() {

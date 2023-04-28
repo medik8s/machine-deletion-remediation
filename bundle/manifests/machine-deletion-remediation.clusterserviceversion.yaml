@@ -50,6 +50,13 @@ spec:
       - kind: MachineDeletionRemediation
         name: machinedeletionremediations
         version: v1alpha1
+      statusDescriptors:
+      - description: 'Represents the observations of a MachineDeletionRemediation''s
+          current state. Known .status.conditions.type are: "Processing" and "Succeeded"'
+        displayName: conditions
+        path: conditions
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:conditions
       version: v1alpha1
     - description: MachineDeletionRemediationTemplate is the Schema for the machinedeletionremediationtemplates
         API

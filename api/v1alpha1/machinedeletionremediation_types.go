@@ -20,6 +20,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	// ProcessingConditionType is the condition type used to signal NHC the remediation has started, and it is in progress, or has finished
+	ProcessingConditionType = "Processing"
+	// SucceededConditionType is the condition type used to signal NHC whether the remediation was successful or not
+	SucceededConditionType = "Succeeded"
+)
+
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
@@ -32,8 +39,13 @@ type MachineDeletionRemediationSpec struct {
 
 // MachineDeletionRemediationStatus defines the observed state of MachineDeletionRemediation
 type MachineDeletionRemediationStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// +operator-sdk:csv:customresourcedefinitions:type=status,displayName="conditions",xDescriptors="urn:alm:descriptor:io.kubernetes.conditions"
+	// Represents the observations of a MachineDeletionRemediation's current state.
+	// Known .status.conditions.type are: "Processing" and "Succeeded"
+	// +listType=map
+	// +listMapKey=type
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 //+kubebuilder:object:root=true

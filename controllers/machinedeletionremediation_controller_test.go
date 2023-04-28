@@ -10,6 +10,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -24,11 +25,17 @@ const (
 	workerNodeName, masterNodeName, noneExistingNodeName = "worker-node-x", "master-node-x", "phantom-node"
 	workerNodeMachineName, masterNodeMachineName         = "worker-node-x-machine", "master-node-x-machine"
 	mockDeleteFailMessage                                = "mock delete failure"
+	noMachineDeletionRemediationCRFound                  = "noMachineDeletionRemediationCRFound"
+	processingConditionNotSetError                       = "ProcessingConditionNotSet"
+	processingConditionSetButNoMatchError                = "ProcessingConditionSetButNoMatch"
+	processingConditionSetAndMatchSuccess                = "ProcessingConditionSetAndMatch"
+	processingConditionStartedInfo                       = "{\"processingConditionStatus\": \"True\", \"succededConditionStatus\": \"Unknown\", \"reason\": \"RemediationStarted\"}"
 )
+
+var underTest *v1alpha1.MachineDeletionRemediation
 
 var _ = Describe("Machine Deletion Remediation CR", func() {
 	var (
-		underTest                            *v1alpha1.MachineDeletionRemediation
 		workerNodeMachine, masterNodeMachine *v1beta1.Machine
 		workerNode, masterNode               *v1.Node
 		//phantomNode is never created by client
@@ -128,11 +135,20 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					underTest = createRemediation(workerNode)
 				})
 				It("worker machine is deleted", func() {
+					// The transition of the Processing Condition status from
+					// unset to "Started", and finally to "Finished" is too
+					// fast to test the initial value ("Started") by inspecting
+					// the actual MDR CR. For this reason the initial value is not
+					// tested here.
+					verifyStatusCondition(v1alpha1.ProcessingConditionType, metav1.ConditionFalse)
+					verifyStatusCondition(v1alpha1.SucceededConditionType, metav1.ConditionTrue)
+
 					verifyMachineIsDeleted(workerNodeMachineName)
 					verifyMachineNotDeleted(masterNodeMachineName)
 
 					Expect(k8sClient.Get(context.Background(), client.ObjectKeyFromObject(underTest), underTest)).To(Succeed())
 					Expect(underTest.GetAnnotations()).ToNot(BeNil())
+
 				})
 			})
 		})
@@ -228,6 +244,9 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					Eventually(func() bool {
 						return plogs.Contains(mockDeleteFailMessage)
 					}, 30*time.Second, 1*time.Second).Should(BeTrue())
+
+					verifyStatusCondition(v1alpha1.ProcessingConditionType, metav1.ConditionFalse)
+					verifyStatusCondition(v1alpha1.SucceededConditionType, metav1.ConditionFalse)
 				})
 			})
 		})
@@ -304,4 +323,42 @@ func deleteIgnoreNotFound() func(ctx context.Context, obj client.Object) error {
 		}
 		return nil
 	}
+}
+
+func verifyStatusCondition(conditionType string, conditionStatus metav1.ConditionStatus) {
+	By("Verify that Status.Conditions are correct")
+
+	mdr := &v1alpha1.MachineDeletionRemediation{}
+	var gotCondition *metav1.Condition
+	Eventually(func() string {
+		if err := k8sClient.Get(context.Background(), client.ObjectKeyFromObject(underTest), mdr); err != nil {
+			return noMachineDeletionRemediationCRFound
+		}
+		gotCondition = meta.FindStatusCondition(mdr.Status.Conditions, conditionType)
+		if gotCondition == nil {
+			return processingConditionNotSetError
+		}
+		if meta.IsStatusConditionPresentAndEqual(mdr.Status.Conditions, conditionType, conditionStatus) {
+			return processingConditionSetAndMatchSuccess
+		}
+		return processingConditionSetButNoMatchError
+	}, "20s", "1s").Should(Equal(processingConditionSetAndMatchSuccess))
+}
+
+func setStopRemediationAnnotation() {
+	key := client.ObjectKey{
+		Name:      underTest.Name,
+		Namespace: underTest.Namespace,
+	}
+
+	ExpectWithOffset(1, k8sClient.Get(context.Background(), key, underTest)).To(Succeed())
+
+	annotations := underTest.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string, 1)
+	}
+	annotations[nhcTimeOutAnnotation] = time.Now().Format(time.RFC3339)
+	underTest.SetAnnotations(annotations)
+
+	Expect(k8sClient.Update(context.Background(), underTest)).ToNot(HaveOccurred())
 }

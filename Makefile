@@ -181,7 +181,7 @@ test-mutation: verify-no-changes fetch-mutation ## Run mutation tests in manual 
 test-e2e: ## Run end to end tests
 	# KUBECONFIG must be set to the cluster, and MDR needs to be deployed already
 	@test -n "${KUBECONFIG}" -o -r ${HOME}/.kube/config || (echo "Failed to find kubeconfig in ~/.kube/config or no KUBECONFIG set"; exit 1)
-	go test ./e2e -coverprofile cover.out -v -timeout 25m -ginkgo.vv
+	go test ./e2e -coverprofile cover.out -v -timeout 25m -ginkgo.vv  ${TEST_OPS}
 
 ##@ Build
 

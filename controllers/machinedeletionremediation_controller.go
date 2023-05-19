@@ -106,9 +106,6 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 	var err error
 	var remediation *v1alpha1.MachineDeletionRemediation
 	if remediation, err = r.getRemediation(ctx, req); remediation == nil || err != nil {
-		if apiErrors.IsNotFound(err) {
-			return ctrl.Result{}, nil
-		}
 		return ctrl.Result{}, err
 	}
 

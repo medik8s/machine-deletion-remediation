@@ -77,7 +77,7 @@ var _ = Describe("E2E tests", func() {
 					key := client.ObjectKeyFromObject(machine)
 					err := k8sClient.Get(context.TODO(), key, createMachineStruct())
 					return errors.IsNotFound(err)
-				}, 5*time.Minute, 10*time.Second).Should(BeTrue())
+				}, "5m", "10s").Should(BeTrue())
 
 				By("checking the Status condition Processing is False after machine deletion")
 				verifyStatusCondition(v1alpha1.ProcessingConditionType, metav1.ConditionFalse)
@@ -104,7 +104,7 @@ var _ = Describe("E2E tests", func() {
 					newMachine := getAssociatedMachine(newNode)
 					g.Expect(newMachine.GetUID()).ShouldNot(Equal(machine.GetUID()))
 					g.Expect(newMachine.GetCreationTimestamp().Time).Should(BeTemporally(">=", mdr.GetCreationTimestamp().Time))
-				}, 15*time.Minute, 10*time.Second).Should(Succeed())
+				}, "15m", "10s").Should(Succeed())
 			})
 		})
 	})

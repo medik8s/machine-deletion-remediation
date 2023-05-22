@@ -140,6 +140,18 @@ fmt: goimports ## Run go goimports against code - goimports = go fmt + fixing im
 vet:
 	go vet ./...
 
+.PHONY: go-tidy
+go-tidy: # Run go mod tidy - add missing and remove unused modules.
+	go mod tidy
+
+.PHONY: go-vendor
+go-vendor:  # Run go mod vendor - make vendored copy of dependencies.
+	go mod vendor
+
+.PHONY: go-verify
+go-verify: go-tidy go-vendor # Run go mod verify - verify dependencies have expected content
+	go mod verify
+
 .PHONY: test-imports
 test-imports: sort-imports ## Check for sorted imports
 	$(SORT_IMPORTS) .
@@ -160,7 +172,7 @@ fetch-mutation: ## fetch mutation package.
 # Use TEST_OPS to pass further options to `go test` (e.g. verbosity and/or -ginkgo.focus)
 export TEST_OPS ?= ""
 .PHONY: test
-test: manifests generate test-imports fmt vet envtest 
+test: manifests generate go-verify fmt vet test-imports envtest 
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path  --bin-dir $(PROJECT_DIR)/testbin)" \
 		go test ./controllers/... -coverprofile cover.out ${TEST_OPS}
 

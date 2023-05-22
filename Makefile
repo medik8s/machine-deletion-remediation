@@ -121,23 +121,20 @@ help: ## Display this help.
 
 ##@ Development
 
-# Generate manifests e.g. CRD, RBAC etc.
 .PHONY: manifests
-manifests: controller-gen
+manifests: controller-gen ## Generate manifests e.g. CRD, RBAC etc.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
-# Generate code
 .PHONY: generate
-generate: controller-gen
+generate: controller-gen ## Generate code
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 .PHONY: fmt
 fmt: goimports ## Run go goimports against code - goimports = go fmt + fixing imports.
 	$(GOIMPORTS) -w  ./main.go ./api ./controllers ./e2e
 
-# Run go vet against code
 .PHONY: vet
-vet:
+vet: ## Run go vet against code
 	go vet ./...
 
 .PHONY: go-tidy
@@ -172,14 +169,16 @@ fetch-mutation: ## fetch mutation package.
 # Use TEST_OPS to pass further options to `go test` (e.g. verbosity and/or -ginkgo.focus)
 export TEST_OPS ?= ""
 .PHONY: test
-test: manifests generate go-verify fmt vet test-imports envtest 
+test: manifests generate go-verify fmt vet test-imports envtest ## Generate and format code, run tests, generate manifests and bundle
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path  --bin-dir $(PROJECT_DIR)/testbin)" \
 		go test ./controllers/... -coverprofile cover.out ${TEST_OPS}
 
+.PHONY: test-mutation
 test-mutation: verify-no-changes fetch-mutation ## Run mutation tests in manual mode.
 	echo -e "## Verifying diff ## \n##Mutations tests actually changes the code while running - this is a safeguard in order to be able to easily revert mutation tests changes (in case mutation tests have not completed properly)##"
 	./hack/test-mutation.sh
 
+.PHONY: test-mutation-ci
 test-mutation-ci: fetch-mutation ## Run mutation tests as part of auto build process.
 	./hack/test-mutation.sh
 
@@ -189,16 +188,21 @@ test-e2e: ## Run end to end tests
 	@test -n "${KUBECONFIG}" -o -r ${HOME}/.kube/config || (echo "Failed to find kubeconfig in ~/.kube/config or no KUBECONFIG set"; exit 1)
 	go test ./e2e -coverprofile cover.out -v -timeout 25m -ginkgo.vv
 
+##@ Build
 
+.PHONY: manager
 manager: generate fmt vet ## Build manager binary
 	./hack/build.sh ./bin
 
+.PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
+.PHONY: docker-build
 docker-build: test ## Build docker image with the manager.
 	docker build -t ${IMG} .
 
+.PHONY: docker-push
 docker-push: ## Push docker image with the manager.
 	docker push ${IMG}
 
@@ -208,20 +212,17 @@ docker-push: ## Push docker image with the manager.
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/crd | kubectl apply -f -
 
-# Uninstall CRDs from a cluster
 .PHONY: uninstall
-uninstall: manifests kustomize
+uninstall: manifests kustomize ## Uninstall CRDs from a cluster
 	$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
-# Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 .PHONY: deploy
-deploy: manifests kustomize
+deploy: manifests kustomize ## Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
-# UnDeploy controller from the configured Kubernetes cluster in ~/.kube/config
 .PHONY: undeploy
-undeploy:
+undeploy: ## UnDeploy controller from the configured Kubernetes cluster in ~/.kube/config
 	$(KUSTOMIZE) build config/default | kubectl delete -f -
 
 
@@ -301,19 +302,16 @@ bundle-community: ## Update displayName field in the bundle's CSV
 bundle-validate: operator-sdk ## Validate the bundle directory with additional validators (suite=operatorframework), such as Kubernetes deprecated APIs (https://kubernetes.io/docs/reference/using-api/deprecation-guide/) based on bundle.CSV.Spec.MinKubeVersion
 	$(OPERATOR_SDK) bundle validate ./bundle --select-optional suite=operatorframework
 
-# Build the bundle image.
 .PHONY: bundle-build
 bundle-build: bundle bundle-update ## Build the bundle image.
 	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
-# Push the bundle image
 .PHONY: bundle-push
 bundle-push: ## Push the bundle image.
 	$(MAKE) docker-push IMG=$(BUNDLE_IMG)
 
-# Run bundle image
 .PHONY: bundle-run
-bundle-run: operator-sdk
+bundle-run: operator-sdk ## Run bundle image
 	$(OPERATOR_SDK) -n openshift-operators run bundle $(BUNDLE_IMG)
 
 .PHONY: opm

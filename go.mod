@@ -7,6 +7,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.7.0
 	github.com/onsi/gomega v1.24.1
 	github.com/openshift/machine-api-operator v0.2.1-0.20210104142355-8e6ae0acdfcf
+	github.com/pkg/errors v0.9.1
 	go.uber.org/zap v1.21.0
 	k8s.io/api v0.25.0
 	k8s.io/apimachinery v0.25.0
@@ -53,7 +54,6 @@ require (
 	github.com/openshift/api v0.0.0-20201216151826-78a19e96f9eb // indirect
 	github.com/openshift/client-go v0.0.0-20201214125552-e615e336eb49 // indirect
 	github.com/openshift/cluster-api-provider-gcp v0.0.1-0.20201201000827-1117a4fc438c // indirect
-	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_golang v1.12.2 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.32.1 // indirect

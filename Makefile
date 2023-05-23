@@ -121,23 +121,20 @@ help: ## Display this help.
 
 ##@ Development
 
-# Generate manifests e.g. CRD, RBAC etc.
 .PHONY: manifests
-manifests: controller-gen
+manifests: controller-gen ## Generate manifests e.g. CRD, RBAC etc.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
-# Generate code
 .PHONY: generate
-generate: controller-gen
+generate: controller-gen ## Generate code
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 .PHONY: fmt
 fmt: goimports ## Run go goimports against code - goimports = go fmt + fixing imports.
 	$(GOIMPORTS) -w  ./main.go ./api ./controllers ./e2e
 
-# Run go vet against code
 .PHONY: vet
-vet:
+vet: ## Run go vet against code
 	go vet ./...
 
 .PHONY: go-tidy
@@ -172,16 +169,15 @@ fetch-mutation: ## fetch mutation package.
 # Use TEST_OPS to pass further options to `go test` (e.g. verbosity and/or -ginkgo.focus)
 export TEST_OPS ?= ""
 .PHONY: test
-test: manifests generate go-verify fmt vet test-imports envtest 
+test: manifests generate go-verify fmt vet test-imports envtest ## Generate and format code, run tests, generate manifests and bundle
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path  --bin-dir $(PROJECT_DIR)/testbin)" \
 		go test ./controllers/... -coverprofile cover.out ${TEST_OPS}
 
+.PHONY: test-mutation
 test-mutation: verify-no-changes fetch-mutation ## Run mutation tests in manual mode.
 	echo -e "## Verifying diff ## \n##Mutations tests actually changes the code while running - this is a safeguard in order to be able to easily revert mutation tests changes (in case mutation tests have not completed properly)##"
 	./hack/test-mutation.sh
 
-test-mutation-ci: fetch-mutation ## Run mutation tests as part of auto build process.
-	./hack/test-mutation.sh
 
 .PHONY: test-e2e
 test-e2e: ## Run end to end tests
@@ -189,16 +185,21 @@ test-e2e: ## Run end to end tests
 	@test -n "${KUBECONFIG}" -o -r ${HOME}/.kube/config || (echo "Failed to find kubeconfig in ~/.kube/config or no KUBECONFIG set"; exit 1)
 	go test ./e2e -coverprofile cover.out -v -timeout 25m -ginkgo.vv
 
+##@ Build
 
+.PHONY: manager
 manager: generate fmt vet ## Build manager binary
 	./hack/build.sh ./bin
 
+.PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
+.PHONY: docker-build
 docker-build: test ## Build docker image with the manager.
 	docker build -t ${IMG} .
 
+.PHONY: docker-push
 docker-push: ## Push docker image with the manager.
 	docker push ${IMG}
 
@@ -208,20 +209,17 @@ docker-push: ## Push docker image with the manager.
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/crd | kubectl apply -f -
 
-# Uninstall CRDs from a cluster
 .PHONY: uninstall
-uninstall: manifests kustomize
+uninstall: manifests kustomize ## Uninstall CRDs from a cluster
 	$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
-# Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 .PHONY: deploy
-deploy: manifests kustomize
+deploy: manifests kustomize ## Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
-# UnDeploy controller from the configured Kubernetes cluster in ~/.kube/config
 .PHONY: undeploy
-undeploy:
+undeploy: ## UnDeploy controller from the configured Kubernetes cluster in ~/.kube/config
 	$(KUSTOMIZE) build config/default | kubectl delete -f -
 
 
@@ -272,50 +270,6 @@ rm -rf $$TMP_DIR ;\
 }
 endef
 
-.PHONY: bundle
-bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metadata, then validate generated files.
-	$(OPERATOR_SDK) generate kustomize manifests -q
-	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
-	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
-	$(MAKE) bundle-validate
-
-##@ Bundle Creation Addition
-## Some addition to bundle creation in the bundle
-DEFAULT_ICON_BASE64 := $(shell base64 --wrap=0 ./config/assets/medik8s_blue_icon.png)
-export ICON_BASE64 ?= ${DEFAULT_ICON_BASE64}
-export CSV="./bundle/manifests/$(OPERATOR_NAME).clusterserviceversion.yaml"
-
-.PHONY: bundle-update
-bundle-update: ## Update containerImage, createdAt, and icon fields in the bundle's CSV, then validate the bundle directory
-	sed -r -i "s|containerImage: .*|containerImage: $(IMG)|;" ${CSV}
-	sed -r -i "s|createdAt: .*|createdAt: \"`date '+%Y-%m-%d %T'`\"|;" ${CSV}
-	sed -r -i "s|base64data:.*|base64data: ${ICON_BASE64}|;" ${CSV}
-	$(MAKE) bundle-validate
-
-.PHONY: bundle-community
-bundle-community: ## Update displayName field in the bundle's CSV
-	sed -r -i "s|displayName: Machine Deletion Remediation operator.*|displayName: Machine Deletion Remediation Operator - Community Edition|;" ${CSV}
-	$(MAKE) bundle-update
-
-.PHONY: bundle-validate
-bundle-validate: operator-sdk ## Validate the bundle directory with additional validators (suite=operatorframework), such as Kubernetes deprecated APIs (https://kubernetes.io/docs/reference/using-api/deprecation-guide/) based on bundle.CSV.Spec.MinKubeVersion
-	$(OPERATOR_SDK) bundle validate ./bundle --select-optional suite=operatorframework
-
-# Build the bundle image.
-.PHONY: bundle-build
-bundle-build: bundle bundle-update ## Build the bundle image.
-	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
-
-# Push the bundle image
-.PHONY: bundle-push
-bundle-push: ## Push the bundle image.
-	$(MAKE) docker-push IMG=$(BUNDLE_IMG)
-
-# Run bundle image
-.PHONY: bundle-run
-bundle-run: operator-sdk
-	$(OPERATOR_SDK) -n openshift-operators run bundle $(BUNDLE_IMG)
-
 .PHONY: opm
 OPM_DIR = $(LOCALBIN)/opm
 OPM = $(OPM_DIR)/$(OPM_VERSION)/opm
@@ -340,6 +294,48 @@ define operator-framework-tool
 	chmod +x $(1) ;\
 	}
 endef
+
+##@ Working with Bundle
+
+.PHONY: bundle
+bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metadata, then validate generated files.
+	$(OPERATOR_SDK) generate kustomize manifests -q
+	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
+	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+	$(MAKE) bundle-validate
+
+## Some addition to bundle creation in the bundle
+DEFAULT_ICON_BASE64 := $(shell base64 --wrap=0 ./config/assets/medik8s_blue_icon.png)
+export ICON_BASE64 ?= ${DEFAULT_ICON_BASE64}
+export CSV="./bundle/manifests/$(OPERATOR_NAME).clusterserviceversion.yaml"
+
+.PHONY: bundle-update
+bundle-update: ## Update containerImage, createdAt, and icon fields in the bundle's CSV, then validate the bundle directory
+	sed -r -i "s|containerImage: .*|containerImage: $(IMG)|;" ${CSV}
+	sed -r -i "s|createdAt: .*|createdAt: \"`date '+%Y-%m-%d %T'`\"|;" ${CSV}
+	sed -r -i "s|base64data:.*|base64data: ${ICON_BASE64}|;" ${CSV}
+	$(MAKE) bundle-validate
+
+.PHONY: bundle-community
+bundle-community: ## Update displayName field in the bundle's CSV
+	sed -r -i "s|displayName: Machine Deletion Remediation operator.*|displayName: Machine Deletion Remediation Operator - Community Edition|;" ${CSV}
+	$(MAKE) bundle-update
+
+.PHONY: bundle-validate
+bundle-validate: operator-sdk ## Validate the bundle directory with additional validators (suite=operatorframework), such as Kubernetes deprecated APIs (https://kubernetes.io/docs/reference/using-api/deprecation-guide/) based on bundle.CSV.Spec.MinKubeVersion
+	$(OPERATOR_SDK) bundle validate ./bundle --select-optional suite=operatorframework
+
+.PHONY: bundle-build
+bundle-build: bundle bundle-update ## Build the bundle image.
+	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
+
+.PHONY: bundle-push
+bundle-push: ## Push the bundle image.
+	$(MAKE) docker-push IMG=$(BUNDLE_IMG)
+
+.PHONY: bundle-run
+bundle-run: operator-sdk ## Run bundle image
+	$(OPERATOR_SDK) -n openshift-operators run bundle $(BUNDLE_IMG)
 
 # A comma-separated list of bundle images (e.g. make catalog-build BUNDLE_IMGS=example.com/operator-bundle:v0.1.0,example.com/operator-bundle:v0.2.0).
 # These images MUST exist in a registry and be pull-able.
@@ -370,3 +366,7 @@ container-build: ## Build containers
 .PHONY: container-push
 container-push:  ## Push containers (NOTE: catalog can't be build before bundle was pushed)
 	make docker-push bundle-push catalog-build catalog-push
+
+.PHONY: test-mutation-ci
+test-mutation-ci: fetch-mutation ## Run mutation tests as part of auto build process.
+	./hack/test-mutation.sh

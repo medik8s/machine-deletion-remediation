@@ -178,9 +178,6 @@ test-mutation: verify-no-changes fetch-mutation ## Run mutation tests in manual 
 	echo -e "## Verifying diff ## \n##Mutations tests actually changes the code while running - this is a safeguard in order to be able to easily revert mutation tests changes (in case mutation tests have not completed properly)##"
 	./hack/test-mutation.sh
 
-.PHONY: test-mutation-ci
-test-mutation-ci: fetch-mutation ## Run mutation tests as part of auto build process.
-	./hack/test-mutation.sh
 
 .PHONY: test-e2e
 test-e2e: ## Run end to end tests
@@ -273,6 +270,33 @@ rm -rf $$TMP_DIR ;\
 }
 endef
 
+.PHONY: opm
+OPM_DIR = $(LOCALBIN)/opm
+OPM = $(OPM_DIR)/$(OPM_VERSION)/opm
+opm: ## Download opm locally if necessary.
+	$(call operator-framework-tool, $(OPM), $(OPM_DIR),https://github.com/operator-framework/operator-registry/releases/download/$(OPM_VERSION)/$${OS}-$${ARCH}-opm )
+
+.PHONY: operator-sdk
+OPERATOR_SDK_DIR ?= $(LOCALBIN)/operator-sdk
+OPERATOR_SDK = $(OPERATOR_SDK_DIR)/$(OPERATOR_SDK_VERSION)/operator-sdk
+operator-sdk: ## Download operator-sdk locally if necessary.
+	$(call operator-framework-tool, $(OPERATOR_SDK), $(OPERATOR_SDK_DIR),github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/operator-sdk_$${OS}_$${ARCH})
+
+# operator-framework-tool will delete old package $2, then download $3 to $1.
+define operator-framework-tool
+@[ -f $(1) ] || { \
+	set -e ;\
+	rm -rf $(2) ;\
+	mkdir -p $(dir $(1)) ;\
+	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
+	echo "Downloading $(3)" ;\
+	curl -sSLo $(1) $(3) ;\
+	chmod +x $(1) ;\
+	}
+endef
+
+##@ Working with Bundle
+
 .PHONY: bundle
 bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metadata, then validate generated files.
 	$(OPERATOR_SDK) generate kustomize manifests -q
@@ -280,7 +304,6 @@ bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metada
 	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
 	$(MAKE) bundle-validate
 
-##@ Bundle Creation Addition
 ## Some addition to bundle creation in the bundle
 DEFAULT_ICON_BASE64 := $(shell base64 --wrap=0 ./config/assets/medik8s_blue_icon.png)
 export ICON_BASE64 ?= ${DEFAULT_ICON_BASE64}
@@ -314,31 +337,6 @@ bundle-push: ## Push the bundle image.
 bundle-run: operator-sdk ## Run bundle image
 	$(OPERATOR_SDK) -n openshift-operators run bundle $(BUNDLE_IMG)
 
-.PHONY: opm
-OPM_DIR = $(LOCALBIN)/opm
-OPM = $(OPM_DIR)/$(OPM_VERSION)/opm
-opm: ## Download opm locally if necessary.
-	$(call operator-framework-tool, $(OPM), $(OPM_DIR),https://github.com/operator-framework/operator-registry/releases/download/$(OPM_VERSION)/$${OS}-$${ARCH}-opm )
-
-.PHONY: operator-sdk
-OPERATOR_SDK_DIR ?= $(LOCALBIN)/operator-sdk
-OPERATOR_SDK = $(OPERATOR_SDK_DIR)/$(OPERATOR_SDK_VERSION)/operator-sdk
-operator-sdk: ## Download operator-sdk locally if necessary.
-	$(call operator-framework-tool, $(OPERATOR_SDK), $(OPERATOR_SDK_DIR),github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/operator-sdk_$${OS}_$${ARCH})
-
-# operator-framework-tool will delete old package $2, then download $3 to $1.
-define operator-framework-tool
-@[ -f $(1) ] || { \
-	set -e ;\
-	rm -rf $(2) ;\
-	mkdir -p $(dir $(1)) ;\
-	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	echo "Downloading $(3)" ;\
-	curl -sSLo $(1) $(3) ;\
-	chmod +x $(1) ;\
-	}
-endef
-
 # A comma-separated list of bundle images (e.g. make catalog-build BUNDLE_IMGS=example.com/operator-bundle:v0.1.0,example.com/operator-bundle:v0.2.0).
 # These images MUST exist in a registry and be pull-able.
 BUNDLE_IMGS ?= $(BUNDLE_IMG)
@@ -368,3 +366,7 @@ container-build: ## Build containers
 .PHONY: container-push
 container-push:  ## Push containers (NOTE: catalog can't be build before bundle was pushed)
 	make docker-push bundle-push catalog-build catalog-push
+
+.PHONY: test-mutation-ci
+test-mutation-ci: fetch-mutation ## Run mutation tests as part of auto build process.
+	./hack/test-mutation.sh

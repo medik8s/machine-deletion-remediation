@@ -2,17 +2,18 @@
 FROM quay.io/centos/centos:stream8 AS builder
 RUN dnf install git golang -y
 
-# Ensure go 1.19
-RUN go install golang.org/dl/go1.19@latest
-RUN ~/go/bin/go1.19 download
-RUN /bin/cp -f ~/go/bin/go1.19 /usr/bin/go
-RUN go version
-
 WORKDIR /workspace
 
 # Copy the Go Modules manifests
 COPY go.mod go.mod
 COPY go.sum go.sum
+
+# Ensure correct Go version
+RUN export GO_VERSION=$(grep -E "go [[:digit:]]\.[[:digit:]][[:digit:]]" go.mod | awk '{print $2}') && \
+    go install golang.org/dl/go${GO_VERSION}@latest && \
+    ~/go/bin/go${GO_VERSION} download && \
+    /bin/cp -f ~/go/bin/go${GO_VERSION} /usr/bin/go && \
+    go version
 
 # Copy the go source
 COPY main.go main.go

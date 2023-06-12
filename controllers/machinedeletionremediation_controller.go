@@ -41,8 +41,8 @@ const (
 	machineAnnotationOpenshift = "machine.openshift.io/machine"
 	machineKind                = "Machine"
 	machineSetKind             = "MachineSet"
-	// MachineNameNamespaceAnnotation contains to-be-deleted Machine's Name and Namespace
-	MachineNameNamespaceAnnotation = "machine-deletion-remediation.medik8s.io/machineNameNamespace"
+	// MachineNameNsAnnotation contains the to-be-deleted Machine's Name and Namespace
+	MachineNameNsAnnotation = "machine-deletion-remediation.medik8s.io/machineNameNamespace"
 	// Infos
 	postponedMachineDeletionInfo  = "node-associated machine was not deleted yet"
 	successfulMachineDeletionInfo = "node-associated machine correctly deleted"
@@ -90,38 +90,27 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 		return ctrl.Result{}, err
 	}
 
-	annotations := remediation.GetAnnotations()
-	if annotations != nil {
-		machineNameNamespace, exists := annotations[MachineNameNamespaceAnnotation]
-		if exists {
-			machineName, machineNamespace, err := extractNameAndNamespace(machineNameNamespace, remediation.GetName())
-			if err != nil {
-				log.Error(err, "could not get Machine data from remediation", "remediation", remediation.GetName(), "annotation", machineNameNamespace)
-				return ctrl.Result{}, nil
-			}
+	log.Info("Machine Deletion Remediation CR found", "name", remediation.GetName())
 
-			ok, err := r.verifyMachineIsDeleted(ctx, machineName, machineNamespace, remediation.Name)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-			if !ok {
-				return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
-			}
-			return ctrl.Result{}, nil
-		}
-	}
-
-	var node *v1.Node
-	if node, err = r.getNodeFromMdr(remediation); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	log.Info("MDR CR and affected Node found", "node", node.GetName())
+	// Remediation's name was created from Node's name
+	nodeName := remediation.GetName()
 
 	var machine *unstructured.Unstructured
-	if machine, err = r.buildMachineFromNode(node); err != nil {
-		r.Log.Error(err, noMachineFoundError, "node name", node.Name)
+	if machine, err = r.getMachine(remediation); err != nil {
+		if apiErrors.IsNotFound(err) {
+			return ctrl.Result{}, nil
+		}
+		log.Error(err, "Unexpected error fetching Machine from Node", "node", nodeName)
 		return ctrl.Result{}, err
+	}
+
+	log.Info("node-associated machine found", "node", remediation.Name, "machine", machine.GetName())
+
+	if !machine.GetDeletionTimestamp().IsZero() {
+		// Machine deletion requested already.
+		// Log deletion progress until the Machine exists
+		log.Info(postponedMachineDeletionInfo, "node", nodeName, "machine", machine.GetName(), "machine status.phase", getMachineStatusPhase(machine))
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
 	if !hasControllerOwner(machine) {
@@ -129,28 +118,22 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 		return ctrl.Result{}, nil
 	}
 
-	log.Info("node-associated machine found", "node", node.Name, "machine", machine.GetName())
-
-	err = r.deleteMachineOfNode(ctx, machine, remediation.Name)
-	if err != nil {
-		return ctrl.Result{}, err
+	// save Machine's name and namespace to follow its deletion phase
+	if err = r.saveMachineNameNs(ctx, remediation, machine.GetName(), machine.GetNamespace()); err != nil {
+		log.Error(err, "could not save Machine's Name and Namespace", "machine name", machine.GetName(), "machine namespace", machine.GetNamespace())
+		return ctrl.Result{}, errors.Wrapf(err, "failed to save Machine's name and namespace")
 	}
 
-	err = r.setDeletedMachineAnnotation(ctx, remediation, machine)
+	log.Info("request node-associated machine deletion", "machine", machine.GetName(), "node", nodeName)
+	err = r.Delete(ctx, machine)
 	if err != nil {
-		return ctrl.Result{}, errors.Wrapf(err, "failed to update remediation CR with timeout annotation")
+		log.Error(err, "failed to delete machine associated to node", "machine", machine.GetName, "node", nodeName)
+		return ctrl.Result{}, err
 	}
 
 	// requeue immediately to check machine deletion progression
 	return ctrl.Result{Requeue: true}, nil
-}
 
-func (r *MachineDeletionRemediationReconciler) deleteMachineOfNode(ctx context.Context, machine *unstructured.Unstructured, nodeName string) error {
-	if err := r.Client.Delete(ctx, machine); err != nil {
-		r.Log.Error(err, "failed to delete machine associated to node", "node name", nodeName)
-		return err
-	}
-	return nil
 }
 
 func hasControllerOwner(machine *unstructured.Unstructured) bool {
@@ -191,28 +174,33 @@ func (r *MachineDeletionRemediationReconciler) getNodeFromMdr(mdr *v1alpha1.Mach
 	}
 
 	if err := r.Get(context.Background(), key, node); err != nil {
-		r.Log.Error(err, noNodeFoundError, "node name", mdr.Name)
 		return nil, err
 	}
 	return node, nil
 }
 
-func (r *MachineDeletionRemediationReconciler) buildMachineFromNode(node *v1.Node) (*unstructured.Unstructured, error) {
-
-	var nodeAnnotations map[string]string
-	if nodeAnnotations = node.Annotations; nodeAnnotations == nil {
-		return nil, fmt.Errorf(noAnnotationsError, node.Name)
-	}
-	var machineNameNamespace, machineName string
-
-	//OpenShift Machine
-	if machineNameNamespace = nodeAnnotations[machineAnnotationOpenshift]; len(machineNameNamespace) == 0 {
-		return nil, fmt.Errorf(noMachineAnnotationError, node.Name)
-	}
-
-	machineName, machineNamespace, err := extractNameAndNamespace(machineNameNamespace, node.Name)
+func (r *MachineDeletionRemediationReconciler) getMachine(remediation *v1alpha1.MachineDeletionRemediation) (*unstructured.Unstructured, error) {
+	machineName, machineNs, err := getMachineNameNsFromRemediation(remediation)
 	if err != nil {
+		r.Log.Error(err, "could not get Machine data from remediation", "remediation", remediation.GetName(), "annotation", MachineNameNsAnnotation)
 		return nil, err
+	}
+
+	var gotMachineFromNode bool
+	if machineName == "" {
+		// Remediation does not have the MachineNameNsAnnotation yet.
+		// Get the Machine's data from its Node.
+		node, err := r.getNodeFromMdr(remediation)
+		if err != nil {
+			r.Log.Error(err, noNodeFoundError, "node name", remediation.Name)
+			return nil, err
+		}
+		if machineName, machineNs, err = getMachineNameNsFromNode(node); err != nil {
+			r.Log.Error(err, "could not get Machine Name NS from Node", "node", node.Name, "annotations", node.GetAnnotations())
+			return nil, err
+		}
+
+		gotMachineFromNode = true
 	}
 
 	machine := new(unstructured.Unstructured)
@@ -221,77 +209,100 @@ func (r *MachineDeletionRemediationReconciler) buildMachineFromNode(node *v1.Nod
 
 	key := client.ObjectKey{
 		Name:      machineName,
-		Namespace: machineNamespace,
+		Namespace: machineNs,
 	}
 
 	if err := r.Get(context.TODO(), key, machine); err != nil {
+		if apiErrors.IsNotFound(err) {
+			if gotMachineFromNode {
+				// The Machine's Name and Ns came from the related Node, it was not expected not to find the Machine
+				r.Log.Error(err, noMachineFoundError, "node", remediation.Name, "machine", machineName)
+			} else {
+				// The Machine's Name and Ns came from CR annotation, the Machine might have been deleted upon our request
+				r.Log.Info(successfulMachineDeletionInfo, "node", remediation.Name, "machine", machineName)
+			}
+		}
 		return nil, err
 	}
 	return machine, nil
 }
 
-func (r *MachineDeletionRemediationReconciler) verifyMachineIsDeleted(ctx context.Context, machineName, MachineNamespace, nodeName string) (bool, error) {
-	key := client.ObjectKey{
-		Name:      machineName,
-		Namespace: MachineNamespace,
-	}
+// saveMachineNameNs saves Machine Name and Namespace in a remediation's annotation
 
-	machine := new(unstructured.Unstructured)
-	machine.SetKind(machineKind)
-	machine.SetAPIVersion(v1beta1.SchemeGroupVersion.String())
-	if err := r.Get(ctx, key, machine); err != nil {
-		if apiErrors.IsNotFound(err) {
-			r.Log.Info(successfulMachineDeletionInfo, "node", nodeName, "machine", machineName)
-			return true, nil
-		}
-		r.Log.Error(err, "unexpected error retrieving the node-associated machine after deletion request", "node", nodeName, "machine", key.Name)
-		return false, err
-	}
-
-	machinePhase, err := getMachineStatusPhase(machine)
-	if err != nil {
-		r.Log.Error(err, "could not get machine's phase")
-		machinePhase = "unknown"
-	}
-
-	r.Log.Info(postponedMachineDeletionInfo, "node", nodeName, "machine", machineName, "machine status.phase", machinePhase)
-	return false, nil
-}
-
-func (r *MachineDeletionRemediationReconciler) setDeletedMachineAnnotation(ctx context.Context, remediation *v1alpha1.MachineDeletionRemediation, machine *unstructured.Unstructured) error {
+func (r *MachineDeletionRemediationReconciler) saveMachineNameNs(ctx context.Context, remediation *v1alpha1.MachineDeletionRemediation, machineName, machineNamespace string) error {
 	annotations := remediation.GetAnnotations()
 	if annotations == nil {
 		annotations = make(map[string]string, 1)
+	} else if _, exists := annotations[MachineNameNsAnnotation]; exists {
+		return nil
 	}
 
-	annotations[MachineNameNamespaceAnnotation] = fmt.Sprintf("%s/%s", machine.GetNamespace(), machine.GetName())
+	annotations[MachineNameNsAnnotation] = fmt.Sprintf("%s/%s", machineNamespace, machineName)
 	remediation.SetAnnotations(annotations)
 
 	return r.Update(ctx, remediation)
 }
 
-func extractNameAndNamespace(nameNamespace string, nodeName string) (string, string, error) {
-	if nameNamespaceSlice := strings.Split(nameNamespace, "/"); len(nameNamespaceSlice) == 2 {
-		return nameNamespaceSlice[1], nameNamespaceSlice[0], nil
+func getMachineNameNsFromRemediation(remediation *v1alpha1.MachineDeletionRemediation) (name, namespace string, err error) {
+	annotations := remediation.GetAnnotations()
+	nameNs, exists := annotations[MachineNameNsAnnotation]
+	if !exists {
+		return "", "", nil
+	}
+
+	name, namespace, err = extractNameAndNamespace(nameNs, remediation.GetName())
+	if err != nil {
+		msg := "could not get Machine data from remediation '%s' annotation '%s': error %w"
+		return "", "", fmt.Errorf(msg, remediation.GetName(), nameNs, err)
+	}
+	return name, namespace, err
+}
+
+func getMachineNameNsFromNode(node *v1.Node) (string, string, error) {
+	var nodeAnnotations map[string]string
+	if nodeAnnotations = node.Annotations; nodeAnnotations == nil {
+		return "", "", fmt.Errorf(noAnnotationsError, node.Name)
+	}
+
+	var machineNameNs string
+	if machineNameNs = nodeAnnotations[machineAnnotationOpenshift]; len(machineNameNs) == 0 {
+		return "", "", fmt.Errorf(noMachineAnnotationError, node.Name)
+	}
+
+	if slice := strings.Split(machineNameNs, "/"); len(slice) == 2 {
+		return slice[1], slice[0], nil
+	}
+	return "", "", fmt.Errorf(invalidValueMachineAnnotationError, node.Name)
+}
+
+func extractNameAndNamespace(nameNs string, nodeName string) (string, string, error) {
+	if nameNsSlice := strings.Split(nameNs, "/"); len(nameNsSlice) == 2 {
+		return nameNsSlice[1], nameNsSlice[0], nil
 	}
 	return "", "", fmt.Errorf(invalidValueMachineAnnotationError, nodeName)
 }
 
-func getMachineStatusPhase(machine *unstructured.Unstructured) (string, error) {
-	status, ok, err := unstructured.NestedMap(machine.Object, "status")
+func getMachineStatusPhase(machine *unstructured.Unstructured) string {
+	log := ctrl.Log.WithName("getMachineStatusPhase")
+
+	status, exists, err := unstructured.NestedMap(machine.Object, "status")
 	if err != nil {
-		return "", fmt.Errorf("could not get Machine's status: error %w", err)
+		log.Error(err, "could not get machine's status", "machine", machine.GetName())
+		return "unknown"
 	}
-	if !ok {
-		return "", fmt.Errorf("Machine object does not have a status field")
+	if !exists {
+		log.Info("machine does not have status", "machine", machine.GetName())
+		return "unknown"
 	}
 
-	phase, ok, err := unstructured.NestedString(status, "phase")
+	phase, exists, err := unstructured.NestedString(status, "phase")
 	if err != nil {
-		return "", fmt.Errorf("could not get Machine's status.phase: error %w", err)
+		log.Error(err, "could not get machine's status", "machine", machine.GetName())
+		return "unknown"
 	}
-	if !ok {
-		return "", fmt.Errorf("Machine object does not have a status.phase field")
+	if !exists {
+		log.Info("machine does not have phase", "machine", machine.GetName())
+		return "unknown"
 	}
-	return phase, nil
+	return phase
 }

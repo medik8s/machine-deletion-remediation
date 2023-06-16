@@ -337,6 +337,11 @@ bundle-push: ## Push the bundle image.
 bundle-run: operator-sdk ## Run bundle image
 	$(OPERATOR_SDK) -n openshift-operators run bundle $(BUNDLE_IMG)
 
+.PHONY: bundle-cleanup
+bundle-cleanup: operator-sdk ## Remove bundle installed via bundle-run
+	$(OPERATOR_SDK) -n openshift-operators cleanup $(OPERATOR_NAME)
+
+
 # A comma-separated list of bundle images (e.g. make catalog-build BUNDLE_IMGS=example.com/operator-bundle:v0.1.0,example.com/operator-bundle:v0.2.0).
 # These images MUST exist in a registry and be pull-able.
 BUNDLE_IMGS ?= $(BUNDLE_IMG)

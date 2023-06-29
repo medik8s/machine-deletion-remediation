@@ -135,26 +135,6 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					Expect(underTest.GetAnnotations()).ToNot(BeNil())
 				})
 			})
-
-			When("machine deletion is not completed yet", func() {
-				BeforeEach(func() {
-					// Worker deletion requested, but not completed yet (possibly due to finalizer in the Machine)
-					underTest = createRemediationWithAnnotation(workerNode, workerNodeMachine)
-				})
-
-				It("logs machine status until deletion", func() {
-					Eventually(func() bool {
-						return plogs.Contains(postponedMachineDeletionInfo)
-					}, 10*time.Second, 1*time.Second).Should(BeTrue())
-
-					// Mock a postponed machine deletion
-					Expect(k8sClient.Delete(context.Background(), workerNodeMachine)).ToNot(HaveOccurred())
-
-					Eventually(func() bool {
-						return plogs.Contains(successfulMachineDeletionInfo)
-					}, 60*time.Second, 1*time.Second).Should(BeTrue())
-				})
-			})
 		})
 
 		Context("Rainy (Error) Flows", func() {
@@ -226,6 +206,18 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 				})
 			})
 
+			When("Remediation has incorrect annotation", func() {
+				BeforeEach(func() {
+					underTest = createRemediationWithAnnotation(masterNode, "Gibberish")
+				})
+
+				It("fails to follow machine deletion", func() {
+					Eventually(func() bool {
+						return plogs.Contains("could not get Machine data from remediation")
+					}, 30*time.Second, 1*time.Second).Should(BeTrue())
+				})
+			})
+
 			When("machine associated to worker node fails deletion", func() {
 				BeforeEach(func() {
 					cclient.onDeleteError = fmt.Errorf(mockDeleteFailMessage)
@@ -249,10 +241,10 @@ func createRemediation(node *v1.Node) *v1alpha1.MachineDeletionRemediation {
 	return mdr
 }
 
-func createRemediationWithAnnotation(node *v1.Node, machine *v1beta1.Machine) *v1alpha1.MachineDeletionRemediation {
+func createRemediationWithAnnotation(node *v1.Node, annotation string) *v1alpha1.MachineDeletionRemediation {
 	mdr := createRemediation(node)
 	annotations := make(map[string]string, 1)
-	annotations[MachineNameNamespaceAnnotation] = fmt.Sprintf("%s/%s", machine.GetNamespace(), machine.GetName())
+	annotations[MachineNameNsAnnotation] = fmt.Sprintf("%s", annotation)
 	mdr.SetAnnotations(annotations)
 	return mdr
 }

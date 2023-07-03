@@ -32,8 +32,9 @@ type MachineDeletionRemediationSpec struct {
 
 // MachineDeletionRemediationStatus defines the observed state of MachineDeletionRemediation
 type MachineDeletionRemediationStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Consecutive number of errors upon deleting a Machine
+	//+operator-sdk:csv:customresourcedefinitions:type=status
+	ErrorOnDeleteCount int `json:"errorOnDeleteCount,omitempty"`
 }
 
 //+kubebuilder:object:root=true

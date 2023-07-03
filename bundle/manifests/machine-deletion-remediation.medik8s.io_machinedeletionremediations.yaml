@@ -41,6 +41,10 @@ spec:
           status:
             description: MachineDeletionRemediationStatus defines the observed state
               of MachineDeletionRemediation
+            properties:
+              errorOnDeleteCount:
+                description: Consecutive number of errors upon deleting a Machine
+                type: integer
             type: object
         type: object
     served: true

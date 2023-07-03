@@ -229,6 +229,14 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 						return plogs.Contains(mockDeleteFailMessage)
 					}, 30*time.Second, 1*time.Second).Should(BeTrue())
 				})
+
+				It("stops deletion retries after max attemps was reached", func() {
+					Eventually(func() bool {
+						return plogs.Contains(maxRetriesReachedFailMessage)
+					}, time.Second).Should(BeTrue(), "could not find message '%s' in logs", maxRetriesReachedFailMessage)
+
+					verifyMachineNotDeleted(workerNodeMachineName)
+				})
 			})
 		})
 	})

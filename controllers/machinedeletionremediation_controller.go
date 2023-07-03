@@ -29,6 +29,7 @@ import (
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -38,9 +39,10 @@ import (
 )
 
 const (
-	machineAnnotationOpenshift = "machine.openshift.io/machine"
-	machineKind                = "Machine"
-	machineSetKind             = "MachineSet"
+	machineAnnotationOpenshift     = "machine.openshift.io/machine"
+	machineKind                    = "Machine"
+	machineSetKind                 = "MachineSet"
+	maxAllowedErrorToDeleteMachine = 5
 	// MachineNameNsAnnotation contains the to-be-deleted Machine's Name and Namespace
 	MachineNameNsAnnotation = "machine-deletion-remediation.medik8s.io/machineNameNamespace"
 	// Infos
@@ -53,6 +55,7 @@ const (
 	failedToDeleteMachineError         = "failed to delete machine of node name: %s"
 	noNodeFoundError                   = "failed to fetch node"
 	noMachineFoundError                = "failed to fetch machine of node"
+	maxRetriesReachedFailMessage       = "too many consecutive errors on Machine deletion"
 )
 
 // MachineDeletionRemediationReconciler reconciles a MachineDeletionRemediation object
@@ -76,7 +79,7 @@ type MachineDeletionRemediationReconciler struct {
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.8.3/pkg/reconcile
-func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (finalResult ctrl.Result, finalErr error) {
 	log := r.Log.WithValues("machinedeletionremediation", req.NamespacedName)
 
 	log.Info("reconciling...")
@@ -91,6 +94,15 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 	}
 
 	log.Info("Machine Deletion Remediation CR found", "name", remediation.GetName())
+
+	defer func() {
+		if updateErr := r.updateStatus(ctx, remediation); updateErr != nil {
+			if !apiErrors.IsConflict(updateErr) {
+				finalErr = utilerrors.NewAggregate([]error{updateErr, finalErr})
+			}
+			finalResult.RequeueAfter = time.Second
+		}
+	}()
 
 	// Remediation's name was created from Node's name
 	nodeName := remediation.GetName()
@@ -127,7 +139,13 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 	log.Info("request node-associated machine deletion", "machine", machine.GetName(), "node", nodeName)
 	err = r.Delete(ctx, machine)
 	if err != nil {
-		log.Error(err, "failed to delete machine associated to node", "machine", machine.GetName, "node", nodeName)
+		remediation.Status.ErrorOnDeleteCount += 1
+		if remediation.Status.ErrorOnDeleteCount >= maxAllowedErrorToDeleteMachine {
+			// too many errors, do not re-queue
+			log.Error(err, maxRetriesReachedFailMessage, "machine", machine.GetName(), "node", nodeName, "error count", remediation.Status.ErrorOnDeleteCount)
+			return ctrl.Result{}, nil
+		}
+		log.Error(err, "failed to delete machine associated to node", "machine", machine.GetName(), "node", nodeName, "error count", remediation.Status.ErrorOnDeleteCount)
 		return ctrl.Result{}, err
 	}
 
@@ -241,6 +259,16 @@ func (r *MachineDeletionRemediationReconciler) saveMachineNameNs(ctx context.Con
 	remediation.SetAnnotations(annotations)
 
 	return r.Update(ctx, remediation)
+}
+
+func (r *MachineDeletionRemediationReconciler) updateStatus(ctx context.Context, mdr *v1alpha1.MachineDeletionRemediation) error {
+	if err := r.Client.Status().Update(ctx, mdr); err != nil {
+		if !apiErrors.IsConflict(err) {
+			r.Log.Error(err, "failed to update mdr status")
+		}
+		return err
+	}
+	return nil
 }
 
 func getMachineNameNsFromRemediation(remediation *v1alpha1.MachineDeletionRemediation) (name, namespace string, err error) {

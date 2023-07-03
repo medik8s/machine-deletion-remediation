@@ -26,6 +26,10 @@ spec:
       - kind: MachineDeletionRemediation
         name: machinedeletionremediations
         version: v1alpha1
+      statusDescriptors:
+      - description: Consecutive number of errors upon deleting a Machine
+        displayName: Error On Delete Count
+        path: errorOnDeleteCount
       version: v1alpha1
     - description: MachineDeletionRemediationTemplate is the Schema for the machinedeletionremediationtemplates
         API

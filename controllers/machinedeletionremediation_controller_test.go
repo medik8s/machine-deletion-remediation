@@ -130,7 +130,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 				})
 			})
 
-			When("worker node remediation exist", func() {
+			When("worker node remediation exists", func() {
 				BeforeEach(func() {
 					underTest = createRemediation(workerNode)
 				})
@@ -224,7 +224,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 			When("Remediation has incorrect annotation", func() {
 				BeforeEach(func() {
-					underTest = createRemediationWithAnnotation(masterNode, "Gibberish")
+					underTest = createRemediationWithAnnotation(masterNode, MachineNameNsAnnotation, "Gibberish")
 				})
 
 				It("fails to follow machine deletion", func() {
@@ -243,8 +243,19 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 				It("returns the same delete failure error", func() {
 					Eventually(func() bool {
 						return plogs.Contains(mockDeleteFailMessage)
-					}, 30*time.Second, 1*time.Second).Should(BeTrue())
+					}, "10s", "1s").Should(BeTrue())
 
+					verifyStatusCondition(v1alpha1.ProcessingConditionType, metav1.ConditionFalse)
+					verifyStatusCondition(v1alpha1.SucceededConditionType, metav1.ConditionTrue)
+				})
+			})
+
+			When("NHC stops the remediation", func() {
+				BeforeEach(func() {
+					underTest = createRemediationWithAnnotation(workerNode, nhcTimeOutAnnotation, "some timestamp")
+				})
+
+				It("returns without completing remediation", func() {
 					verifyStatusCondition(v1alpha1.ProcessingConditionType, metav1.ConditionFalse)
 					verifyStatusCondition(v1alpha1.SucceededConditionType, metav1.ConditionFalse)
 				})
@@ -260,10 +271,10 @@ func createRemediation(node *v1.Node) *v1alpha1.MachineDeletionRemediation {
 	return mdr
 }
 
-func createRemediationWithAnnotation(node *v1.Node, annotation string) *v1alpha1.MachineDeletionRemediation {
+func createRemediationWithAnnotation(node *v1.Node, key, annotation string) *v1alpha1.MachineDeletionRemediation {
 	mdr := createRemediation(node)
 	annotations := make(map[string]string, 1)
-	annotations[MachineNameNsAnnotation] = fmt.Sprintf("%s", annotation)
+	annotations[key] = fmt.Sprintf("%s", annotation)
 	mdr.SetAnnotations(annotations)
 	return mdr
 }
@@ -329,12 +340,11 @@ func verifyStatusCondition(conditionType string, conditionStatus metav1.Conditio
 	By("Verify that Status.Conditions are correct")
 
 	mdr := &v1alpha1.MachineDeletionRemediation{}
-	var gotCondition *metav1.Condition
 	Eventually(func() string {
 		if err := k8sClient.Get(context.Background(), client.ObjectKeyFromObject(underTest), mdr); err != nil {
 			return noMachineDeletionRemediationCRFound
 		}
-		gotCondition = meta.FindStatusCondition(mdr.Status.Conditions, conditionType)
+		gotCondition := meta.FindStatusCondition(mdr.Status.Conditions, conditionType)
 		if gotCondition == nil {
 			return processingConditionNotSetError
 		}
@@ -342,7 +352,8 @@ func verifyStatusCondition(conditionType string, conditionStatus metav1.Conditio
 			return processingConditionSetAndMatchSuccess
 		}
 		return processingConditionSetButNoMatchError
-	}, "20s", "1s").Should(Equal(processingConditionSetAndMatchSuccess))
+
+	}, "20s", "1s").Should(Equal(processingConditionSetAndMatchSuccess), "'%v' status condition was expected to be %v", conditionType, conditionStatus)
 }
 
 func setStopRemediationAnnotation() {

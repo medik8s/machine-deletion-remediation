@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -59,14 +60,6 @@ const (
 )
 
 type machineDeletionRemediationState string
-
-const (
-	mdrStateNotStarted        machineDeletionRemediationState = "RemediationNotStarted"
-	mdrStateStarted           machineDeletionRemediationState = "RemediationStarted"
-	mdrStateDeletionRequested machineDeletionRemediationState = "MachineDeletionRequested"
-	mdrStateFailed            machineDeletionRemediationState = "MachineDeletionFailed"
-	mdrStateCompleted         machineDeletionRemediationState = "MachineDeletionCompleted"
-)
 
 type processingChangeReason string
 
@@ -111,8 +104,29 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 
 	log.Info("Machine Deletion Remediation CR found", "name", remediation.GetName())
 
+	defer func() {
+		if updateErr := r.updateStatus(ctx, remediation); updateErr != nil {
+			if !apiErrors.IsConflict(updateErr) {
+				finalErr = utilerrors.NewAggregate([]error{updateErr, finalErr})
+			}
+			finalResult.RequeueAfter = time.Second
+		}
+	}()
+
 	// Remediation's name was created from Node's name
 	nodeName := remediation.GetName()
+
+	if r.isStoppedByNHC(remediation) {
+		log.Info("NHC stop requested")
+		r.updateConditions(remediationTerminatedByNHC, remediation)
+		return ctrl.Result{}, nil
+	}
+
+	if updateRequired, err := r.updateConditions(remediationStarted, remediation); err != nil {
+		log.Error(err, "could not update Status conditions")
+	} else if updateRequired {
+		return ctrl.Result{RequeueAfter: time.Second}, nil
+	}
 
 	var machine *unstructured.Unstructured
 	if machine, err = r.getMachine(remediation); err != nil {
@@ -146,7 +160,7 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 	log.Info("request node-associated machine deletion", "machine", machine.GetName(), "node", nodeName)
 	err = r.Delete(ctx, machine)
 	if err != nil {
-		log.Error(err, "failed to delete machine associated to node", "machine", machine.GetName, "node", nodeName)
+		log.Error(err, "failed to delete machine associated to node", "machine", machine.GetName(), "node", nodeName)
 		return ctrl.Result{}, err
 	}
 
@@ -235,9 +249,11 @@ func (r *MachineDeletionRemediationReconciler) getMachine(remediation *v1alpha1.
 			if gotMachineFromNode {
 				// The Machine's Name and Ns came from the related Node, it was not expected not to find the Machine
 				r.Log.Error(err, noMachineFoundError, "node", remediation.Name, "machine", machineName)
+				r.updateConditions(remediationFailed, remediation)
 			} else {
 				// The Machine's Name and Ns came from CR annotation, the Machine might have been deleted upon our request
 				r.Log.Info(successfulMachineDeletionInfo, "node", remediation.Name, "machine", machineName)
+				r.updateConditions(remediationFinished, remediation)
 			}
 		}
 		return nil, err
@@ -288,8 +304,8 @@ func (r *MachineDeletionRemediationReconciler) updateStatus(ctx context.Context,
 
 // updateConditions updates the status conditions of a MachineDeletionRemediation object based on the provided processingChangeReason.
 // note that it does not update server copy of MachineDeletionRemediation object
-// return an error if an unknown processingChangeReason is provided
-func (r *MachineDeletionRemediationReconciler) updateConditions(reason processingChangeReason, mdr *v1alpha1.MachineDeletionRemediation) error {
+// return a boolean, indicating if the Status Condition needed to be updated or not, and an error if an unknown processingChangeReason is provided
+func (r *MachineDeletionRemediationReconciler) updateConditions(reason processingChangeReason, mdr *v1alpha1.MachineDeletionRemediation) (bool, error) {
 	var processingConditionStatus, succeededConditionStatus metav1.ConditionStatus
 
 	switch reason {
@@ -305,12 +321,12 @@ func (r *MachineDeletionRemediationReconciler) updateConditions(reason processin
 	default:
 		err := fmt.Errorf("unknown processingChangeReason:%s", reason)
 		r.Log.Error(err, "couldn't update MDR Status Conditions")
-		return err
+		return false, err
 	}
 
 	if meta.IsStatusConditionPresentAndEqual(mdr.Status.Conditions, v1alpha1.ProcessingConditionType, processingConditionStatus) &&
 		meta.IsStatusConditionPresentAndEqual(mdr.Status.Conditions, v1alpha1.SucceededConditionType, succeededConditionStatus) {
-		return nil
+		return false, nil
 	}
 
 	r.Log.Info("updating Status Condition", "processingConditionStatus", processingConditionStatus, "succededConditionStatus", succeededConditionStatus, "reason", string(reason))
@@ -326,7 +342,7 @@ func (r *MachineDeletionRemediationReconciler) updateConditions(reason processin
 		Reason: string(reason),
 	})
 
-	return nil
+	return true, nil
 }
 
 // isStoppedByNHC checks if NHC requested to stop the remediation

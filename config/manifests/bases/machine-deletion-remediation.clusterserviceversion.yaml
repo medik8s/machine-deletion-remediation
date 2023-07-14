@@ -32,7 +32,7 @@ spec:
         displayName: conditions
         path: conditions
         x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:conditions
+        - urn:alm:descriptor:io.kubernetes.conditions
       version: v1alpha1
     - description: MachineDeletionRemediationTemplate is the Schema for the machinedeletionremediationtemplates
         API

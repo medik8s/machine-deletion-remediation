@@ -141,7 +141,6 @@ func createRemediation(node *v1.Node) *v1alpha1.MachineDeletionRemediation {
 	}
 
 	ExpectWithOffset(1, k8sClient.Create(context.Background(), mdr)).ToNot(HaveOccurred())
-	//verifyProcessingCondition(v1alpha1.ProcessingConditionType, metav1.ConditionTrue)
 	return mdr
 }
 

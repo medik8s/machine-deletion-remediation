@@ -324,6 +324,13 @@ func (r *MachineDeletionRemediationReconciler) updateConditions(reason processin
 		return false, err
 	}
 
+	// if ProcessingConditionType is already false, it cannot be changed to true again
+	if processingConditionStatus == metav1.ConditionTrue &&
+		meta.IsStatusConditionPresentAndEqual(mdr.Status.Conditions, v1alpha1.ProcessingConditionType, metav1.ConditionFalse) {
+		return false, nil
+	}
+
+	// if the requested Status.Conditions are already set, skip update
 	if meta.IsStatusConditionPresentAndEqual(mdr.Status.Conditions, v1alpha1.ProcessingConditionType, processingConditionStatus) &&
 		meta.IsStatusConditionPresentAndEqual(mdr.Status.Conditions, v1alpha1.SucceededConditionType, succeededConditionStatus) {
 		return false, nil

@@ -118,20 +118,29 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 
 	if r.isStoppedByNHC(remediation) {
 		log.Info("NHC stop requested")
-		r.updateConditions(remediationTerminatedByNHC, remediation)
-		return ctrl.Result{}, nil
+		_, err = r.updateConditions(remediationTerminatedByNHC, remediation)
+		return ctrl.Result{}, err
 	}
 
 	if updateRequired, err := r.updateConditions(remediationStarted, remediation); err != nil {
 		log.Error(err, "could not update Status conditions")
+		return ctrl.Result{}, err
 	} else if updateRequired {
 		return ctrl.Result{RequeueAfter: time.Second}, nil
 	}
 
-	var machine *unstructured.Unstructured
-	if machine, err = r.getMachine(remediation); err != nil {
+	machine, mustExist, err := r.getMachine(remediation)
+	if err != nil {
 		if apiErrors.IsNotFound(err) {
-			return ctrl.Result{}, nil
+			// It is ok to return err == nil here: the Machine does not exist,
+			// either because deleted by MDR or not and the Reconcile has
+			// finished. We return error only if updateConditions failed
+			if mustExist {
+				_, err = r.updateConditions(remediationFailed, remediation)
+			} else {
+				_, err = r.updateConditions(remediationFinished, remediation)
+			}
+			return ctrl.Result{}, err
 		}
 		log.Error(err, "Unexpected error fetching Machine from Node", "node", nodeName)
 		return ctrl.Result{}, err
@@ -211,28 +220,35 @@ func (r *MachineDeletionRemediationReconciler) getNodeFromMdr(mdr *v1alpha1.Mach
 	return node, nil
 }
 
-func (r *MachineDeletionRemediationReconciler) getMachine(remediation *v1alpha1.MachineDeletionRemediation) (*unstructured.Unstructured, error) {
+// getMachine retrieves a machine from the cluster based on the remediation.
+// It returns the machine, a boolean indicating whether the machine was expected to be found,
+// and an error if any occurred during the retrieval process.
+func (r *MachineDeletionRemediationReconciler) getMachine(remediation *v1alpha1.MachineDeletionRemediation) (*unstructured.Unstructured, bool, error) {
+
 	machineName, machineNs, err := getMachineNameNsFromRemediation(remediation)
 	if err != nil {
 		r.Log.Error(err, "could not get Machine data from remediation", "remediation", remediation.GetName(), "annotation", MachineNameNsAnnotation)
-		return nil, err
+		return nil, false, err
 	}
 
-	var gotMachineFromNode bool
+	// If the Machine's Name and Ns come from the related Node, it is expected
+	// to find the Machine in the cluster, while if its Name and Ns come from
+	// CR's annotation, the Machine might have been deleted upon our request.
+	var mustExist bool
 	if machineName == "" {
 		// Remediation does not have the MachineNameNsAnnotation yet.
-		// Get the Machine's data from its Node.
+		// We will try to get the Machine's data from its Node.
 		node, err := r.getNodeFromMdr(remediation)
 		if err != nil {
 			r.Log.Error(err, noNodeFoundError, "node name", remediation.Name)
-			return nil, err
+			return nil, false, err
 		}
 		if machineName, machineNs, err = getMachineNameNsFromNode(node); err != nil {
 			r.Log.Error(err, "could not get Machine Name NS from Node", "node", node.Name, "annotations", node.GetAnnotations())
-			return nil, err
+			return nil, false, err
 		}
 
-		gotMachineFromNode = true
+		mustExist = true
 	}
 
 	machine := new(unstructured.Unstructured)
@@ -245,20 +261,20 @@ func (r *MachineDeletionRemediationReconciler) getMachine(remediation *v1alpha1.
 	}
 
 	if err := r.Get(context.TODO(), key, machine); err != nil {
-		if apiErrors.IsNotFound(err) {
-			if gotMachineFromNode {
-				// The Machine's Name and Ns came from the related Node, it was not expected not to find the Machine
-				r.Log.Error(err, noMachineFoundError, "node", remediation.Name, "machine", machineName)
-				r.updateConditions(remediationFailed, remediation)
-			} else {
-				// The Machine's Name and Ns came from CR annotation, the Machine might have been deleted upon our request
-				r.Log.Info(successfulMachineDeletionInfo, "node", remediation.Name, "machine", machineName)
-				r.updateConditions(remediationFinished, remediation)
-			}
+		if !apiErrors.IsNotFound(err) {
+			return nil, mustExist, err
 		}
-		return nil, err
+
+		// Machine was not found
+		if mustExist {
+			r.Log.Error(err, noMachineFoundError, "node", remediation.Name, "machine", machineName)
+			return nil, mustExist, err
+		}
+
+		r.Log.Info(successfulMachineDeletionInfo, "node", remediation.Name, "machine", machineName)
+		return nil, mustExist, err
 	}
-	return machine, nil
+	return machine, mustExist, nil
 }
 
 // saveMachineNameNs saves Machine Name and Namespace in a remediation's annotation

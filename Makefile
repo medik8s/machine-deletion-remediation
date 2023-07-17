@@ -5,26 +5,24 @@ OPERATOR_NAME := machine-deletion-remediation
 
 ## Tool versions
 # OPERATOR_SDK versions at github.com/operator-framework/operator-sdk/releases
-OPERATOR_SDK_VERSION ?= v1.25.1
+OPERATOR_SDK_VERSION ?= v1.30.0
 
 # OPM versions at https://github.com/operator-framework/operator-registry/releases
-OPM_VERSION = v1.15.1
+OPM_VERSION = v1.28.0
 
 # CONTROLLER_GEN versions at https://github.com/kubernetes-sigs/controller-tools/releases
-CONTROLLER_GEN_VERSION = v0.9.2
+CONTROLLER_GEN_VERSION = v0.12.0
 
 # KUSTOMIZE versions at https://github.com/kubernetes-sigs/kustomize/releases
 # note: update KUSTOMIZE_VERSION and KUSTOMIZE_API_VERSION accordingly.
-KUSTOMIZE_API_VERSION = v4
-KUSTOMIZE_VERSION = v4.5.7
+KUSTOMIZE_API_VERSION = v5
+KUSTOMIZE_VERSION = v5.0.0
 
-# ENVTEST has no tagged versions yet
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_VERSION = v0.0.0-20230208013708-22718275bffe
-ENVTEST_K8S_VERSION = 1.23
+ENVTEST_K8S_VERSION = 1.26
 
 # GoImports versions at https://pkg.go.dev/golang.org/x/tools/cmd/goimports?tab=versions
-GOIMPORTS_VERSION ?= v0.6.0
+GOIMPORTS_VERSION ?= v0.11.0
 
 # Sort-imports versions at https://github.com/slintes/sort-imports/releases
 SORT_IMPORTS_VERSION = v0.2.1
@@ -244,7 +242,7 @@ kustomize: ## Download kustomize locally if necessary
 .PHONY: envtest
 ENVTEST = $(LOCALBIN)/setup-envtest
 envtest: ## Download envtest-setup locally if necessary.
-	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_VERSION))
+	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest)
 
 .PHONY: goimports
 GOIMPORTS = $(LOCALBIN)/goimports
@@ -261,12 +259,8 @@ PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 define go-install-tool
 @[ -f $(1) ] || { \
 set -e ;\
-TMP_DIR=$$(mktemp -d) ;\
-cd $$TMP_DIR ;\
-go mod init tmp ;\
 echo "Downloading $(2)" ;\
 GOBIN=$(PROJECT_DIR)/bin GOFLAGS='' go install $(2) ;\
-rm -rf $$TMP_DIR ;\
 }
 endef
 

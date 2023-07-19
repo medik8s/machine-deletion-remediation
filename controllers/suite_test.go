@@ -83,11 +83,9 @@ type customClient struct {
 	onDeleteError error
 }
 
-func (c *customClient) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) (err error) {
+func (c *customClient) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
 	if c.onDeleteError != nil {
-		// return custom error only once to avoid infinite loop
-		err, c.onDeleteError = c.onDeleteError, nil
-		return err
+		return c.onDeleteError
 	}
 	return c.Client.Delete(ctx, obj, opts...)
 }

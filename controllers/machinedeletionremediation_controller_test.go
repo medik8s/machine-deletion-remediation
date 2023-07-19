@@ -237,6 +237,9 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 			When("machine associated to worker node fails deletion", func() {
 				BeforeEach(func() {
 					cclient.onDeleteError = fmt.Errorf(mockDeleteFailMessage)
+					DeferCleanup(func() {
+						cclient.onDeleteError = nil
+					})
 					underTest = createRemediation(workerNode)
 				})
 
@@ -244,9 +247,6 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					Eventually(func() bool {
 						return plogs.Contains(mockDeleteFailMessage)
 					}, "10s", "1s").Should(BeTrue())
-
-					verifyStatusCondition(v1alpha1.ProcessingConditionType, metav1.ConditionFalse)
-					verifyStatusCondition(v1alpha1.SucceededConditionType, metav1.ConditionTrue)
 				})
 			})
 

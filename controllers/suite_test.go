@@ -32,7 +32,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	"github.com/openshift/api/machine/v1beta1"
 
 	"github.com/medik8s/machine-deletion-remediation/api/v1alpha1"
 	//+kubebuilder:scaffold:imports

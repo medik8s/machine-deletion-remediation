@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	comconditions "github.com/medik8s/common/pkg/conditions"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -70,7 +71,7 @@ var _ = Describe("E2E tests", func() {
 
 			It("deletes the associated Machine", func() {
 				By("checking the Status condition Processing is True before machine deletion")
-				verifyStatusCondition(v1alpha1.ProcessingConditionType, metav1.ConditionTrue)
+				verifyStatusCondition(comconditions.ProcessingType, metav1.ConditionTrue)
 
 				By("checking the Machine was deleted")
 				Eventually(func() bool {
@@ -80,9 +81,9 @@ var _ = Describe("E2E tests", func() {
 				}, "5m", "10s").Should(BeTrue())
 
 				By("checking the Status condition Processing is False after machine deletion")
-				verifyStatusCondition(v1alpha1.ProcessingConditionType, metav1.ConditionFalse)
+				verifyStatusCondition(comconditions.ProcessingType, metav1.ConditionFalse)
 				By("checking the Status condition Succeeded is True after machine deletion")
-				verifyStatusCondition(v1alpha1.SucceededConditionType, metav1.ConditionTrue)
+				verifyStatusCondition(comconditions.SucceededType, metav1.ConditionTrue)
 
 				By("checking a new Node and the Machine associated were created after the CR")
 				Eventually(func(g Gomega) {

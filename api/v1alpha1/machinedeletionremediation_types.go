@@ -20,13 +20,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const (
-	// ProcessingConditionType is the condition type used to signal NHC the remediation has started, and it is in progress, or has finished
-	ProcessingConditionType = "Processing"
-	// SucceededConditionType is the condition type used to signal NHC whether the remediation was successful or not
-	SucceededConditionType = "Succeeded"
-)
-
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 

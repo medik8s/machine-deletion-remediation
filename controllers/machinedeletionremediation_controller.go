@@ -23,6 +23,8 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	commonannotations "github.com/medik8s/common/pkg/annotations"
+	commonconditions "github.com/medik8s/common/pkg/conditions"
 	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
@@ -35,7 +37,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	"github.com/openshift/api/machine/v1beta1"
 
 	"github.com/medik8s/machine-deletion-remediation/api/v1alpha1"
 )
@@ -44,7 +46,6 @@ const (
 	machineAnnotationOpenshift = "machine.openshift.io/machine"
 	machineKind                = "Machine"
 	machineSetKind             = "MachineSet"
-	nhcTimeOutAnnotation       = "remediation.medik8s.io/nhc-timed-out"
 	// MachineNameNsAnnotation contains to-be-deleted Machine's Name and Namespace
 	MachineNameNsAnnotation = "machine-deletion-remediation.medik8s.io/machineNameNamespace"
 	// Infos
@@ -340,27 +341,27 @@ func (r *MachineDeletionRemediationReconciler) updateConditions(reason processin
 		return false, err
 	}
 
-	// if ProcessingConditionType is already false, it cannot be changed to true again
+	// if ProcessingType is already false, it cannot be changed to true again
 	if processingConditionStatus == metav1.ConditionTrue &&
-		meta.IsStatusConditionPresentAndEqual(mdr.Status.Conditions, v1alpha1.ProcessingConditionType, metav1.ConditionFalse) {
+		meta.IsStatusConditionPresentAndEqual(mdr.Status.Conditions, commonconditions.ProcessingType, metav1.ConditionFalse) {
 		return false, nil
 	}
 
 	// if the requested Status.Conditions are already set, skip update
-	if meta.IsStatusConditionPresentAndEqual(mdr.Status.Conditions, v1alpha1.ProcessingConditionType, processingConditionStatus) &&
-		meta.IsStatusConditionPresentAndEqual(mdr.Status.Conditions, v1alpha1.SucceededConditionType, succeededConditionStatus) {
+	if meta.IsStatusConditionPresentAndEqual(mdr.Status.Conditions, commonconditions.ProcessingType, processingConditionStatus) &&
+		meta.IsStatusConditionPresentAndEqual(mdr.Status.Conditions, commonconditions.SucceededType, succeededConditionStatus) {
 		return false, nil
 	}
 
 	r.Log.Info("updating Status Condition", "processingConditionStatus", processingConditionStatus, "succededConditionStatus", succeededConditionStatus, "reason", string(reason))
 	meta.SetStatusCondition(&mdr.Status.Conditions, metav1.Condition{
-		Type:   v1alpha1.ProcessingConditionType,
+		Type:   commonconditions.ProcessingType,
 		Status: processingConditionStatus,
 		Reason: string(reason),
 	})
 
 	meta.SetStatusCondition(&mdr.Status.Conditions, metav1.Condition{
-		Type:   v1alpha1.SucceededConditionType,
+		Type:   commonconditions.SucceededType,
 		Status: succeededConditionStatus,
 		Reason: string(reason),
 	})
@@ -371,7 +372,7 @@ func (r *MachineDeletionRemediationReconciler) updateConditions(reason processin
 // isStoppedByNHC checks if NHC requested to stop the remediation
 func (r *MachineDeletionRemediationReconciler) isStoppedByNHC(remediation *v1alpha1.MachineDeletionRemediation) bool {
 	if remediation != nil && remediation.Annotations != nil && remediation.DeletionTimestamp == nil {
-		_, isTimeoutIssued := remediation.Annotations[nhcTimeOutAnnotation]
+		_, isTimeoutIssued := remediation.Annotations[commonannotations.NhcTimedOut]
 		return isTimeoutIssued
 	}
 	return false

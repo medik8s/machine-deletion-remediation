@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	commonannotations "github.com/medik8s/common/pkg/annotations"
+	comconditions "github.com/medik8s/common/pkg/conditions"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -14,7 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	"github.com/openshift/api/machine/v1beta1"
 
 	"github.com/medik8s/machine-deletion-remediation/api/v1alpha1"
 )
@@ -140,8 +142,8 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					// fast to test the initial value ("Started") by inspecting
 					// the actual MDR CR. For this reason the initial value is not
 					// tested here.
-					verifyStatusCondition(v1alpha1.ProcessingConditionType, metav1.ConditionFalse)
-					verifyStatusCondition(v1alpha1.SucceededConditionType, metav1.ConditionTrue)
+					verifyStatusCondition(comconditions.ProcessingType, metav1.ConditionFalse)
+					verifyStatusCondition(comconditions.SucceededType, metav1.ConditionTrue)
 
 					verifyMachineIsDeleted(workerNodeMachineName)
 					verifyMachineNotDeleted(masterNodeMachineName)
@@ -252,12 +254,12 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 			When("NHC stops the remediation", func() {
 				BeforeEach(func() {
-					underTest = createRemediationWithAnnotation(workerNode, nhcTimeOutAnnotation, "some timestamp")
+					underTest = createRemediationWithAnnotation(workerNode, commonannotations.NhcTimedOut, "some timestamp")
 				})
 
 				It("returns without completing remediation", func() {
-					verifyStatusCondition(v1alpha1.ProcessingConditionType, metav1.ConditionFalse)
-					verifyStatusCondition(v1alpha1.SucceededConditionType, metav1.ConditionFalse)
+					verifyStatusCondition(comconditions.ProcessingType, metav1.ConditionFalse)
+					verifyStatusCondition(comconditions.SucceededType, metav1.ConditionFalse)
 				})
 			})
 		})
@@ -368,7 +370,7 @@ func setStopRemediationAnnotation() {
 	if annotations == nil {
 		annotations = make(map[string]string, 1)
 	}
-	annotations[nhcTimeOutAnnotation] = time.Now().Format(time.RFC3339)
+	annotations[commonannotations.NhcTimedOut] = time.Now().Format(time.RFC3339)
 	underTest.SetAnnotations(annotations)
 
 	Expect(k8sClient.Update(context.Background(), underTest)).ToNot(HaveOccurred())

@@ -32,8 +32,13 @@ type MachineDeletionRemediationSpec struct {
 
 // MachineDeletionRemediationStatus defines the observed state of MachineDeletionRemediation
 type MachineDeletionRemediationStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// +operator-sdk:csv:customresourcedefinitions:type=status,displayName="conditions",xDescriptors="urn:alm:descriptor:io.kubernetes.conditions"
+	// Represents the observations of a MachineDeletionRemediation's current state.
+	// Known .status.conditions.type are: "Processing" and "Succeeded"
+	// +listType=map
+	// +listMapKey=type
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 //+kubebuilder:object:root=true

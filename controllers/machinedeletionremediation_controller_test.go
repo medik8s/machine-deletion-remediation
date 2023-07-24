@@ -5,15 +5,18 @@ import (
 	"fmt"
 	"time"
 
+	commonannotations "github.com/medik8s/common/pkg/annotations"
+	comconditions "github.com/medik8s/common/pkg/conditions"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	"github.com/openshift/api/machine/v1beta1"
 
 	"github.com/medik8s/machine-deletion-remediation/api/v1alpha1"
 )
@@ -24,11 +27,17 @@ const (
 	workerNodeName, masterNodeName, noneExistingNodeName = "worker-node-x", "master-node-x", "phantom-node"
 	workerNodeMachineName, masterNodeMachineName         = "worker-node-x-machine", "master-node-x-machine"
 	mockDeleteFailMessage                                = "mock delete failure"
+	noMachineDeletionRemediationCRFound                  = "noMachineDeletionRemediationCRFound"
+	processingConditionNotSetError                       = "ProcessingConditionNotSet"
+	processingConditionSetButNoMatchError                = "ProcessingConditionSetButNoMatch"
+	processingConditionSetAndMatchSuccess                = "ProcessingConditionSetAndMatch"
+	processingConditionStartedInfo                       = "{\"processingConditionStatus\": \"True\", \"succededConditionStatus\": \"Unknown\", \"reason\": \"RemediationStarted\"}"
 )
+
+var underTest *v1alpha1.MachineDeletionRemediation
 
 var _ = Describe("Machine Deletion Remediation CR", func() {
 	var (
-		underTest                            *v1alpha1.MachineDeletionRemediation
 		workerNodeMachine, masterNodeMachine *v1beta1.Machine
 		workerNode, masterNode               *v1.Node
 		//phantomNode is never created by client
@@ -123,16 +132,25 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 				})
 			})
 
-			When("worker node remediation exist", func() {
+			When("worker node remediation exists", func() {
 				BeforeEach(func() {
 					underTest = createRemediation(workerNode)
 				})
 				It("worker machine is deleted", func() {
+					// The transition of the Processing Condition status from
+					// unset to "Started", and finally to "Finished" is too
+					// fast to test the initial value ("Started") by inspecting
+					// the actual MDR CR. For this reason the initial value is not
+					// tested here.
+					verifyStatusCondition(comconditions.ProcessingType, metav1.ConditionFalse)
+					verifyStatusCondition(comconditions.SucceededType, metav1.ConditionTrue)
+
 					verifyMachineIsDeleted(workerNodeMachineName)
 					verifyMachineNotDeleted(masterNodeMachineName)
 
 					Expect(k8sClient.Get(context.Background(), client.ObjectKeyFromObject(underTest), underTest)).To(Succeed())
 					Expect(underTest.GetAnnotations()).ToNot(BeNil())
+
 				})
 			})
 		})
@@ -208,7 +226,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 			When("Remediation has incorrect annotation", func() {
 				BeforeEach(func() {
-					underTest = createRemediationWithAnnotation(masterNode, "Gibberish")
+					underTest = createRemediationWithAnnotation(masterNode, MachineNameNsAnnotation, "Gibberish")
 				})
 
 				It("fails to follow machine deletion", func() {
@@ -221,13 +239,27 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 			When("machine associated to worker node fails deletion", func() {
 				BeforeEach(func() {
 					cclient.onDeleteError = fmt.Errorf(mockDeleteFailMessage)
+					DeferCleanup(func() {
+						cclient.onDeleteError = nil
+					})
 					underTest = createRemediation(workerNode)
 				})
 
 				It("returns the same delete failure error", func() {
 					Eventually(func() bool {
 						return plogs.Contains(mockDeleteFailMessage)
-					}, 30*time.Second, 1*time.Second).Should(BeTrue())
+					}, "10s", "1s").Should(BeTrue())
+				})
+			})
+
+			When("NHC stops the remediation", func() {
+				BeforeEach(func() {
+					underTest = createRemediationWithAnnotation(workerNode, commonannotations.NhcTimedOut, "some timestamp")
+				})
+
+				It("returns without completing remediation", func() {
+					verifyStatusCondition(comconditions.ProcessingType, metav1.ConditionFalse)
+					verifyStatusCondition(comconditions.SucceededType, metav1.ConditionFalse)
 				})
 			})
 		})
@@ -241,10 +273,10 @@ func createRemediation(node *v1.Node) *v1alpha1.MachineDeletionRemediation {
 	return mdr
 }
 
-func createRemediationWithAnnotation(node *v1.Node, annotation string) *v1alpha1.MachineDeletionRemediation {
+func createRemediationWithAnnotation(node *v1.Node, key, annotation string) *v1alpha1.MachineDeletionRemediation {
 	mdr := createRemediation(node)
 	annotations := make(map[string]string, 1)
-	annotations[MachineNameNsAnnotation] = fmt.Sprintf("%s", annotation)
+	annotations[key] = fmt.Sprintf("%s", annotation)
 	mdr.SetAnnotations(annotations)
 	return mdr
 }
@@ -304,4 +336,42 @@ func deleteIgnoreNotFound() func(ctx context.Context, obj client.Object) error {
 		}
 		return nil
 	}
+}
+
+func verifyStatusCondition(conditionType string, conditionStatus metav1.ConditionStatus) {
+	By("Verify that Status.Conditions are correct")
+
+	mdr := &v1alpha1.MachineDeletionRemediation{}
+	Eventually(func() string {
+		if err := k8sClient.Get(context.Background(), client.ObjectKeyFromObject(underTest), mdr); err != nil {
+			return noMachineDeletionRemediationCRFound
+		}
+		gotCondition := meta.FindStatusCondition(mdr.Status.Conditions, conditionType)
+		if gotCondition == nil {
+			return processingConditionNotSetError
+		}
+		if meta.IsStatusConditionPresentAndEqual(mdr.Status.Conditions, conditionType, conditionStatus) {
+			return processingConditionSetAndMatchSuccess
+		}
+		return processingConditionSetButNoMatchError
+
+	}, "20s", "1s").Should(Equal(processingConditionSetAndMatchSuccess), "'%v' status condition was expected to be %v", conditionType, conditionStatus)
+}
+
+func setStopRemediationAnnotation() {
+	key := client.ObjectKey{
+		Name:      underTest.Name,
+		Namespace: underTest.Namespace,
+	}
+
+	ExpectWithOffset(1, k8sClient.Get(context.Background(), key, underTest)).To(Succeed())
+
+	annotations := underTest.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string, 1)
+	}
+	annotations[commonannotations.NhcTimedOut] = time.Now().Format(time.RFC3339)
+	underTest.SetAnnotations(annotations)
+
+	Expect(k8sClient.Update(context.Background(), underTest)).ToNot(HaveOccurred())
 }

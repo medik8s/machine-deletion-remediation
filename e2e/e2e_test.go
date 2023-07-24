@@ -5,11 +5,13 @@ import (
 	"strings"
 	"time"
 
+	comconditions "github.com/medik8s/common/pkg/conditions"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -27,13 +29,22 @@ const (
 	workerLabelName                     = "node-role.kubernetes.io/worker"
 )
 
+const (
+	noMachineDeletionRemediationCRFound   = "noMachineDeletionRemediationCRFound"
+	processingConditionNotSetError        = "ProcessingConditionNotSet"
+	processingConditionSetButNoMatchError = "ProcessingConditionSetButNoMatch"
+	processingConditionSetAndMatchSuccess = "ProcessingConditionSetAndMatch"
+	processingConditionStartedInfo        = "{\"processingConditionStatus\": \"True\", \"succededConditionStatus\": \"Unknown\", \"reason\": \"RemediationStarted\"}"
+)
+
+var mdr *v1alpha1.MachineDeletionRemediation
+
 var _ = Describe("E2E tests", func() {
 	Context("Machine Deletion Remediation", func() {
 		Describe("CR created for an unhealthy node", func() {
 			var (
 				initialWorkers *v1.NodeList
 				node           *v1.Node
-				mdr            *v1alpha1.MachineDeletionRemediation
 				machine        *unstructured.Unstructured
 			)
 			BeforeEach(func() {
@@ -59,12 +70,20 @@ var _ = Describe("E2E tests", func() {
 			})
 
 			It("deletes the associated Machine", func() {
+				By("checking the Status condition Processing is True before machine deletion")
+				verifyStatusCondition(comconditions.ProcessingType, metav1.ConditionTrue)
+
 				By("checking the Machine was deleted")
 				Eventually(func() bool {
 					key := client.ObjectKeyFromObject(machine)
 					err := k8sClient.Get(context.TODO(), key, createMachineStruct())
 					return errors.IsNotFound(err)
-				}, 5*time.Minute, 10*time.Second).Should(BeTrue())
+				}, "5m", "10s").Should(BeTrue())
+
+				By("checking the Status condition Processing is False after machine deletion")
+				verifyStatusCondition(comconditions.ProcessingType, metav1.ConditionFalse)
+				By("checking the Status condition Succeeded is True after machine deletion")
+				verifyStatusCondition(comconditions.SucceededType, metav1.ConditionTrue)
 
 				By("checking a new Node and the Machine associated were created after the CR")
 				Eventually(func(g Gomega) {
@@ -86,7 +105,7 @@ var _ = Describe("E2E tests", func() {
 					newMachine := getAssociatedMachine(newNode)
 					g.Expect(newMachine.GetUID()).ShouldNot(Equal(machine.GetUID()))
 					g.Expect(newMachine.GetCreationTimestamp().Time).Should(BeTemporally(">=", mdr.GetCreationTimestamp().Time))
-				}, 15*time.Minute, 10*time.Second).Should(Succeed())
+				}, "15m", "10s").Should(Succeed())
 			})
 		})
 	})
@@ -137,4 +156,22 @@ func deleteRemediation(mdr *v1alpha1.MachineDeletionRemediation) {
 		}
 		return err
 	}, timeout, pollInterval).ShouldNot(HaveOccurred(), "failed to delete mdr")
+}
+
+func verifyStatusCondition(conditionType string, conditionStatus metav1.ConditionStatus) {
+
+	var gotCondition *metav1.Condition
+	Eventually(func() string {
+		if err := k8sClient.Get(context.Background(), client.ObjectKeyFromObject(mdr), mdr); err != nil {
+			return noMachineDeletionRemediationCRFound
+		}
+		gotCondition = meta.FindStatusCondition(mdr.Status.Conditions, conditionType)
+		if gotCondition == nil {
+			return processingConditionNotSetError
+		}
+		if meta.IsStatusConditionPresentAndEqual(mdr.Status.Conditions, conditionType, conditionStatus) {
+			return processingConditionSetAndMatchSuccess
+		}
+		return processingConditionSetButNoMatchError
+	}, "30s", "1s").Should(Equal(processingConditionSetAndMatchSuccess))
 }

@@ -65,10 +65,10 @@ type machineDeletionRemediationState string
 type processingChangeReason string
 
 const (
-	remediationStarted         processingChangeReason = "RemediationStarted"
-	remediationTerminatedByNHC processingChangeReason = "RemediationStoppedByNHC"
-	remediationFinished        processingChangeReason = "RemediationFinished"
-	remediationFailed          processingChangeReason = "RemediationFailed"
+	remediationStarted       processingChangeReason = "RemediationStarted"
+	remediationTimedOutByNhc processingChangeReason = "RemediationStoppedByNHC"
+	remediationFinished      processingChangeReason = "RemediationFinished"
+	remediationFailed        processingChangeReason = "RemediationFailed"
 )
 
 // MachineDeletionRemediationReconciler reconciles a MachineDeletionRemediation object
@@ -117,9 +117,9 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 	// Remediation's name was created from Node's name
 	nodeName := remediation.GetName()
 
-	if r.isStoppedByNHC(remediation) {
+	if r.isTimedOutByNHC(remediation) {
 		log.Info("NHC stop requested")
-		_, err = r.updateConditions(remediationTerminatedByNHC, remediation)
+		_, err = r.updateConditions(remediationTimedOutByNhc, remediation)
 		return ctrl.Result{}, err
 	}
 
@@ -332,7 +332,7 @@ func (r *MachineDeletionRemediationReconciler) updateConditions(reason processin
 	case remediationFinished:
 		processingConditionStatus = metav1.ConditionFalse
 		succeededConditionStatus = metav1.ConditionTrue
-	case remediationTerminatedByNHC, remediationFailed:
+	case remediationTimedOutByNhc, remediationFailed:
 		processingConditionStatus = metav1.ConditionFalse
 		succeededConditionStatus = metav1.ConditionFalse
 	default:
@@ -369,8 +369,8 @@ func (r *MachineDeletionRemediationReconciler) updateConditions(reason processin
 	return true, nil
 }
 
-// isStoppedByNHC checks if NHC requested to stop the remediation
-func (r *MachineDeletionRemediationReconciler) isStoppedByNHC(remediation *v1alpha1.MachineDeletionRemediation) bool {
+// isTimedOutByNHC checks if NHC set a timeout annotation on the CR
+func (r *MachineDeletionRemediationReconciler) isTimedOutByNHC(remediation *v1alpha1.MachineDeletionRemediation) bool {
 	if remediation != nil && remediation.Annotations != nil && remediation.DeletionTimestamp == nil {
 		_, isTimeoutIssued := remediation.Annotations[commonannotations.NhcTimedOut]
 		return isTimeoutIssued

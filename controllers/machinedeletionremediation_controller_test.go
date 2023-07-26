@@ -7,6 +7,7 @@ import (
 
 	commonannotations "github.com/medik8s/common/pkg/annotations"
 	comconditions "github.com/medik8s/common/pkg/conditions"
+	commonconditions "github.com/medik8s/common/pkg/conditions"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -150,7 +151,40 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 					Expect(k8sClient.Get(context.Background(), client.ObjectKeyFromObject(underTest), underTest)).To(Succeed())
 					Expect(underTest.GetAnnotations()).ToNot(BeNil())
+				})
+			})
 
+			When("creating a resource in baremetal provider", func() {
+				BeforeEach(func() {
+					setMachineProviderID(workerNodeMachine, "baremetal:///dummy-provider-ID")
+					underTest = createRemediation(workerNode)
+
+				})
+				It("sets PermanentNodeDeletionExpected condition to false", func() {
+					verifyStatusCondition(commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionFalse)
+				})
+			})
+
+			When("creating a resource in cloud provider", func() {
+				BeforeEach(func() {
+					setMachineProviderID(workerNodeMachine, "cloud:///dummy-provider-ID")
+					underTest = createRemediation(workerNode)
+
+				})
+				It("sets PermanentNodeDeletionExpected condition to true", func() {
+					verifyStatusCondition(commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionTrue)
+				})
+			})
+
+			// This should never happen, but it is covered in the code
+			When("creating a resource in an unknown provider", func() {
+				BeforeEach(func() {
+					// do not set the providerID in Machine
+					underTest = createRemediation(workerNode)
+
+				})
+				It("sets PermanentNodeDeletionExpected condition to false", func() {
+					verifyStatusCondition(commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown)
 				})
 			})
 		})
@@ -374,4 +408,14 @@ func setStopRemediationAnnotation() {
 	underTest.SetAnnotations(annotations)
 
 	Expect(k8sClient.Update(context.Background(), underTest)).ToNot(HaveOccurred())
+}
+
+func setMachineProviderID(machine *v1beta1.Machine, providerID string) {
+	EventuallyWithOffset(1, func(g Gomega) {
+		g.Expect(k8sClient.Get(context.Background(), client.ObjectKeyFromObject(machine), machine)).To(Succeed())
+	})
+	k8sClient.Get(context.Background(), client.ObjectKeyFromObject(machine), machine)
+
+	machine.Spec.ProviderID = &providerID
+	Expect(k8sClient.Update(context.TODO(), machine)).To(Succeed())
 }

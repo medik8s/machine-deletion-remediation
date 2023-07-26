@@ -2,10 +2,11 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
-	comconditions "github.com/medik8s/common/pkg/conditions"
+	commonconditions "github.com/medik8s/common/pkg/conditions"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -15,6 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/selection"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -46,6 +48,7 @@ var _ = Describe("E2E tests", func() {
 				initialWorkers *v1.NodeList
 				node           *v1.Node
 				machine        *unstructured.Unstructured
+				platform       string
 			)
 			BeforeEach(func() {
 				// Get the first Worker node available
@@ -57,6 +60,10 @@ var _ = Describe("E2E tests", func() {
 				Expect(len(initialWorkers.Items)).To(BeNumerically(">=", 2))
 				node = &initialWorkers.Items[0]
 				machine = getAssociatedMachine(node)
+
+				var err error
+				platform, err = getPlatform(k8sClient)
+				Expect(err).To(BeNil())
 			})
 
 			JustBeforeEach(func() {
@@ -71,7 +78,7 @@ var _ = Describe("E2E tests", func() {
 
 			It("deletes the associated Machine", func() {
 				By("checking the Status condition Processing is True before machine deletion")
-				verifyStatusCondition(comconditions.ProcessingType, metav1.ConditionTrue)
+				verifyStatusCondition(commonconditions.ProcessingType, metav1.ConditionTrue)
 
 				By("checking the Machine was deleted")
 				Eventually(func() bool {
@@ -81,9 +88,16 @@ var _ = Describe("E2E tests", func() {
 				}, "5m", "10s").Should(BeTrue())
 
 				By("checking the Status condition Processing is False after machine deletion")
-				verifyStatusCondition(comconditions.ProcessingType, metav1.ConditionFalse)
+				verifyStatusCondition(commonconditions.ProcessingType, metav1.ConditionFalse)
 				By("checking the Status condition Succeeded is True after machine deletion")
-				verifyStatusCondition(comconditions.SucceededType, metav1.ConditionTrue)
+				verifyStatusCondition(commonconditions.SucceededType, metav1.ConditionTrue)
+				msg := fmt.Sprintf("checking the Status condition PermanentNodeDeletionExpected to be False on platform BareMetal, True otherwise (this platform is %s)", platform)
+				By(msg)
+				if platform == "BareMetal" {
+					verifyStatusCondition(commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionFalse)
+				} else {
+					verifyStatusCondition(commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionTrue)
+				}
 
 				By("checking a new Node and the Machine associated were created after the CR")
 				Eventually(func(g Gomega) {
@@ -174,4 +188,59 @@ func verifyStatusCondition(conditionType string, conditionStatus metav1.Conditio
 		}
 		return processingConditionSetButNoMatchError
 	}, "30s", "1s").Should(Equal(processingConditionSetAndMatchSuccess))
+}
+
+func getPlatform(c client.Client) (string, error) {
+
+	cluster := &unstructured.Unstructured{}
+	cluster.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "config.openshift.io",
+		Version: "v1",
+		Kind:    "Infrastructure",
+	})
+	key := client.ObjectKey{
+		Name:      "cluster",
+		Namespace: "",
+	}
+	err := c.Get(context.Background(), key, cluster)
+	if err != nil {
+		return "", err
+	}
+	return getClusterPlatform(cluster), nil
+}
+
+func getClusterPlatform(u *unstructured.Unstructured) string {
+	valueName := "status"
+	valMap, exists, err := unstructured.NestedMap(u.Object, valueName)
+	if err != nil {
+		log.Error(err, "could not get value", "value", valueName)
+		return ""
+	}
+	if !exists {
+		log.Info("object does not have value", "value", valueName)
+		return ""
+	}
+
+	valueName = "platformStatus"
+	valMap, exists, err = unstructured.NestedMap(valMap, valueName)
+	if err != nil {
+		log.Error(err, "could not get value", "value", valueName)
+		return ""
+	}
+	if !exists {
+		log.Info("object does not have value", "value", valueName)
+		return ""
+	}
+
+	valueName = "type"
+	value, exists, err := unstructured.NestedString(valMap, valueName)
+	if err != nil {
+		log.Error(err, "could not get value", "value", valueName)
+		return ""
+	}
+	if !exists {
+		log.Info("object does not have value", "value", valueName)
+		return ""
+	}
+	return value
 }

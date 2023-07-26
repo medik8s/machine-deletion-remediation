@@ -20,6 +20,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	MachineDeletionOnCloudProviderReason     = "MachineDeletionOnCloudProviderCausesNewNodeName"
+	MachineDeletionOnBareMetalProviderReason = "MachineDeletionOnBareMetalProviderKeepsNodeName"
+	MachineDeletionOnUndefinedProviderReason = "MachineDeletionUndefinedNodeNameExpectation"
+)
+
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
@@ -34,7 +40,7 @@ type MachineDeletionRemediationSpec struct {
 type MachineDeletionRemediationStatus struct {
 	// +operator-sdk:csv:customresourcedefinitions:type=status,displayName="conditions",xDescriptors="urn:alm:descriptor:io.kubernetes.conditions"
 	// Represents the observations of a MachineDeletionRemediation's current state.
-	// Known .status.conditions.type are: "Processing" and "Succeeded"
+	// Known .status.conditions.type are: "Processing", "Succeeded" and "PermanentNodeDeletionExpected"
 	// +listType=map
 	// +listMapKey=type
 	// +optional

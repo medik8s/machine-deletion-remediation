@@ -58,6 +58,10 @@ const (
 	failedToDeleteMachineError         = "failed to delete machine of node name: %s"
 	noNodeFoundError                   = "failed to fetch node"
 	noMachineFoundError                = "failed to fetch machine of node"
+
+	machineDeletedOnCloudProviderMessage     = "Machine will be deleted and the unhealthy node replaced. This is a Cloud cluster provider: the new node is expected to have a new name"
+	machineDeletedOnBareMetalProviderMessage = "Machine will be deleted and the unhealthy node replaced. This is a BareMetal cluster provider: the new node is NOT expected to have a new name"
+	machineDeletedOnUnknownProviderMessage   = "Machine will be deleted and the unhealthy node replaced. Unknown cluster provider: no information about the new node's name"
 )
 
 type machineDeletionRemediationState string
@@ -148,6 +152,37 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 	}
 
 	log.Info("node-associated machine found", "node", remediation.Name, "machine", machine.GetName())
+
+	// Detect if Node name is expected to change after Machine deletion given
+	// the Platform type. In case of BareMetal platform, the name is NOT
+	// expected to change, for other providers, instead, the name is expected
+	// to change.
+	// The providerID contains the platform type as prefix (e.g. baremetal:///...)
+	var providerID string
+	if providerID, err = getMachineProviderID(machine); err != nil {
+		log.Error(err, "could not get providerID")
+		return ctrl.Result{}, nil
+	}
+
+	var status metav1.ConditionStatus
+	var permanentNodeDeletionExpectedMsg string
+
+	if providerID == "" {
+		log.Info("Machine does not have ProviderID")
+		permanentNodeDeletionExpectedMsg = machineDeletedOnUnknownProviderMessage
+		status = metav1.ConditionUnknown
+	} else if strings.HasPrefix(providerID, "baremetal") {
+		permanentNodeDeletionExpectedMsg = machineDeletedOnBareMetalProviderMessage
+		status = metav1.ConditionFalse
+	} else {
+		permanentNodeDeletionExpectedMsg = machineDeletedOnCloudProviderMessage
+		status = metav1.ConditionTrue
+	}
+
+	if updateRequired := r.setPermanentNodeDeletionExpectedCondition(status, remediation); updateRequired {
+		log.Info(permanentNodeDeletionExpectedMsg)
+		return ctrl.Result{RequeueAfter: time.Second}, nil
+	}
 
 	if !machine.GetDeletionTimestamp().IsZero() {
 		// Machine deletion requested already.
@@ -369,6 +404,35 @@ func (r *MachineDeletionRemediationReconciler) updateConditions(reason processin
 	return true, nil
 }
 
+func (r *MachineDeletionRemediationReconciler) setPermanentNodeDeletionExpectedCondition(status metav1.ConditionStatus, mdr *v1alpha1.MachineDeletionRemediation) bool {
+	var reason, message string
+	switch status {
+	case metav1.ConditionTrue:
+		reason = v1alpha1.MachineDeletionOnCloudProviderReason
+		message = machineDeletedOnCloudProviderMessage
+	case metav1.ConditionFalse:
+		reason = v1alpha1.MachineDeletionOnBareMetalProviderReason
+		message = machineDeletedOnBareMetalProviderMessage
+	case metav1.ConditionUnknown:
+		reason = v1alpha1.MachineDeletionOnUndefinedProviderReason
+		message = machineDeletedOnUnknownProviderMessage
+	}
+
+	if meta.IsStatusConditionPresentAndEqual(mdr.Status.Conditions, commonconditions.PermanentNodeDeletionExpectedType, status) {
+		return false
+	}
+
+	r.Log.Info("updating Status Condition", "PermanentNodeDeletionExpected", status, "reason", reason, "message", message)
+	meta.SetStatusCondition(&mdr.Status.Conditions, metav1.Condition{
+		Type:    commonconditions.PermanentNodeDeletionExpectedType,
+		Status:  status,
+		Reason:  reason,
+		Message: message,
+	})
+
+	return true
+}
+
 // isTimedOutByNHC checks if NHC set a timeout annotation on the CR
 func (r *MachineDeletionRemediationReconciler) isTimedOutByNHC(remediation *v1alpha1.MachineDeletionRemediation) bool {
 	if remediation != nil && remediation.Annotations != nil && remediation.DeletionTimestamp == nil {
@@ -425,4 +489,29 @@ func getMachineStatusPhase(machine *unstructured.Unstructured) string {
 		return "unknown"
 	}
 	return phase
+}
+
+func getMachineProviderID(machine *unstructured.Unstructured) (string, error) {
+	log := ctrl.Log.WithName("getMachineStatusProviderID")
+
+	status, exists, err := unstructured.NestedMap(machine.Object, "spec")
+	if err != nil {
+		log.Error(err, "could not get machine's spec", "machine", machine.GetName())
+		return "", err
+	}
+	if !exists {
+		log.Info("machine does not have spec", "machine", machine.GetName())
+		return "", nil
+	}
+
+	providerID, exists, err := unstructured.NestedString(status, "providerID")
+	if err != nil {
+		log.Error(err, "could not get machine's providerID", "machine", machine.GetName())
+		return "", err
+	}
+	if !exists {
+		log.Info("machine does not have providerID", "machine", machine.GetName())
+		return "", nil
+	}
+	return providerID, nil
 }

@@ -6,7 +6,6 @@ import (
 	"time"
 
 	commonannotations "github.com/medik8s/common/pkg/annotations"
-	comconditions "github.com/medik8s/common/pkg/conditions"
 	commonconditions "github.com/medik8s/common/pkg/conditions"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -143,8 +142,8 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					// fast to test the initial value ("Started") by inspecting
 					// the actual MDR CR. For this reason the initial value is not
 					// tested here.
-					verifyStatusCondition(comconditions.ProcessingType, metav1.ConditionFalse)
-					verifyStatusCondition(comconditions.SucceededType, metav1.ConditionTrue)
+					verifyStatusCondition(commonconditions.ProcessingType, metav1.ConditionFalse)
+					verifyStatusCondition(commonconditions.SucceededType, metav1.ConditionTrue)
 
 					verifyMachineIsDeleted(workerNodeMachineName)
 					verifyMachineNotDeleted(masterNodeMachineName)
@@ -292,8 +291,8 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 				})
 
 				It("returns without completing remediation", func() {
-					verifyStatusCondition(comconditions.ProcessingType, metav1.ConditionFalse)
-					verifyStatusCondition(comconditions.SucceededType, metav1.ConditionFalse)
+					verifyStatusCondition(commonconditions.ProcessingType, metav1.ConditionFalse)
+					verifyStatusCondition(commonconditions.SucceededType, metav1.ConditionFalse)
 				})
 			})
 		})

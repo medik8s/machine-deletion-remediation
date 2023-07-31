@@ -28,7 +28,8 @@ spec:
         version: v1alpha1
       statusDescriptors:
       - description: 'Represents the observations of a MachineDeletionRemediation''s
-          current state. Known .status.conditions.type are: "Processing" and "Succeeded"'
+          current state. Known .status.conditions.type are: "Processing", "Succeeded"
+          and "PermanentNodeDeletionExpected"'
         displayName: conditions
         path: conditions
         x-descriptors:

@@ -41,7 +41,7 @@ export VERSION
 # To re-generate a bundle for other specific channels without changing the standard setup, you can:
 # - use the CHANNELS as arg of the bundle target (e.g make bundle CHANNELS=preview,fast,stable)
 # - use environment variables to overwrite this value (e.g export CHANNELS="preview,fast,stable")
-CHANNELS ?= candidate
+CHANNELS ?= stable
 export CHANNELS
 
 ifneq ($(origin CHANNELS), undefined)
@@ -53,7 +53,7 @@ endif
 # To re-generate a bundle for any other default channel without changing the default setup, you can:
 # - use the DEFAULT_CHANNEL as arg of the bundle target (e.g make bundle DEFAULT_CHANNEL=stable)
 # - use environment variables to overwrite this value (e.g export DEFAULT_CHANNEL="stable")
-DEFAULT_CHANNEL ?= candidate
+DEFAULT_CHANNEL ?= stable
 export DEFAULT_CHANNEL
 
 ifneq ($(origin DEFAULT_CHANNEL), undefined)

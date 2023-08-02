@@ -31,10 +31,17 @@ const (
 	processingConditionNotSetError                       = "ProcessingConditionNotSet"
 	processingConditionSetButNoMatchError                = "ProcessingConditionSetButNoMatch"
 	processingConditionSetAndMatchSuccess                = "ProcessingConditionSetAndMatch"
+	processingConditionSetButWrongReasonError            = "processingConditionSetButWrongReason"
 	processingConditionStartedInfo                       = "{\"processingConditionStatus\": \"True\", \"succededConditionStatus\": \"Unknown\", \"reason\": \"RemediationStarted\"}"
 )
 
 var underTest *v1alpha1.MachineDeletionRemediation
+
+type expectedCondition struct {
+	conditionType   string
+	conditionStatus metav1.ConditionStatus
+	conditionReason conditionChangeReason
+}
 
 var _ = Describe("Machine Deletion Remediation CR", func() {
 	var (
@@ -57,7 +64,6 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 			It("CR is namespace scoped", func() {
 				Expect(underTest.Namespace).To(Not(BeEmpty()))
 			})
-
 		})
 	})
 
@@ -83,7 +89,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 		})
 
 		Context("Sunny Flows", func() {
-			When("remediation does not exist", func() {
+			When("node does not exist", func() {
 				BeforeEach(func() {
 					underTest = createRemediation(phantomNode)
 				})
@@ -91,6 +97,10 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 				It("No machine is deleted", func() {
 					verifyMachineNotDeleted(workerNodeMachineName)
 					verifyMachineNotDeleted(masterNodeMachineName)
+					verifyConditionsMatch([]expectedCondition{
+						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationSkippedNodeNotFound},
+						{commonconditions.SucceededType, metav1.ConditionFalse, remediationSkippedNodeNotFound}})
+					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
 				})
 			})
 
@@ -102,6 +112,11 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 				It("No machine is deleted", func() {
 					verifyMachineNotDeleted(workerNodeMachineName)
 					verifyMachineNotDeleted(masterNodeMachineName)
+					verifyConditionsMatch([]expectedCondition{
+						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationSkippedNoControllerOwner},
+						{commonconditions.SucceededType, metav1.ConditionFalse, remediationSkippedNoControllerOwner},
+						// Cluster provider is not set in this test
+						{commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason}})
 				})
 			})
 
@@ -115,6 +130,11 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 				It("No machine is deleted", func() {
 					verifyMachineNotDeleted(workerNodeMachineName)
 					verifyMachineNotDeleted(masterNodeMachineName)
+					verifyConditionsMatch([]expectedCondition{
+						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationSkippedNoControllerOwner},
+						{commonconditions.SucceededType, metav1.ConditionFalse, remediationSkippedNoControllerOwner},
+						// Cluster provider is not set in this test
+						{commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason}})
 				})
 			})
 
@@ -129,6 +149,11 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 				It("No machine is deleted", func() {
 					verifyMachineNotDeleted(workerNodeMachineName)
 					verifyMachineNotDeleted(masterNodeMachineName)
+					verifyConditionsMatch([]expectedCondition{
+						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationSkippedNoControllerOwner},
+						{commonconditions.SucceededType, metav1.ConditionFalse, remediationSkippedNoControllerOwner},
+						// Cluster provider is not set in this test
+						{commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason}})
 				})
 			})
 
@@ -137,16 +162,19 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					underTest = createRemediation(workerNode)
 				})
 				It("worker machine is deleted", func() {
+					verifyMachineIsDeleted(workerNodeMachineName)
+					verifyMachineNotDeleted(masterNodeMachineName)
+
 					// The transition of the Processing Condition status from
 					// unset to "Started", and finally to "Finished" is too
 					// fast to test the initial value ("Started") by inspecting
 					// the actual MDR CR. For this reason the initial value is not
 					// tested here.
-					verifyStatusCondition(commonconditions.ProcessingType, metav1.ConditionFalse)
-					verifyStatusCondition(commonconditions.SucceededType, metav1.ConditionTrue)
-
-					verifyMachineIsDeleted(workerNodeMachineName)
-					verifyMachineNotDeleted(masterNodeMachineName)
+					verifyConditionsMatch([]expectedCondition{
+						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationFinished},
+						{commonconditions.SucceededType, metav1.ConditionTrue, remediationFinished},
+						// Cluster provider is not set in this test
+						{commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason}})
 
 					Expect(k8sClient.Get(context.Background(), client.ObjectKeyFromObject(underTest), underTest)).To(Succeed())
 					Expect(underTest.GetAnnotations()).ToNot(BeNil())
@@ -160,7 +188,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 				})
 				It("sets PermanentNodeDeletionExpected condition to false", func() {
-					verifyStatusCondition(commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionFalse)
+					verifyConditionMatches(commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionFalse, v1alpha1.MachineDeletionOnBareMetalProviderReason)
 				})
 			})
 
@@ -171,7 +199,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 				})
 				It("sets PermanentNodeDeletionExpected condition to true", func() {
-					verifyStatusCondition(commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionTrue)
+					verifyConditionMatches(commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionTrue, v1alpha1.MachineDeletionOnCloudProviderReason)
 				})
 			})
 
@@ -183,7 +211,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 				})
 				It("sets PermanentNodeDeletionExpected condition to false", func() {
-					verifyStatusCondition(commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown)
+					verifyConditionMatches(commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason)
 				})
 			})
 		})
@@ -198,6 +226,11 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					Eventually(func() bool {
 						return plogs.Contains(noNodeFoundError)
 					}, 30*time.Second, 1*time.Second).Should(BeTrue())
+
+					verifyConditionsMatch([]expectedCondition{
+						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationSkippedNodeNotFound},
+						{commonconditions.SucceededType, metav1.ConditionFalse, remediationSkippedNodeNotFound}})
+					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
 				})
 			})
 
@@ -212,6 +245,11 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					Eventually(func() bool {
 						return plogs.Contains(fmt.Sprintf(noAnnotationsError, underTest.Name))
 					}, 30*time.Second, 1*time.Second).Should(BeTrue())
+
+					verifyConditionsMatch([]expectedCondition{
+						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationFailed},
+						{commonconditions.SucceededType, metav1.ConditionFalse, remediationFailed}})
+					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
 				})
 			})
 
@@ -226,6 +264,11 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					Eventually(func() bool {
 						return plogs.Contains(fmt.Sprintf(noMachineAnnotationError, underTest.Name))
 					}, 30*time.Second, 1*time.Second).Should(BeTrue())
+
+					verifyConditionsMatch([]expectedCondition{
+						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationFailed},
+						{commonconditions.SucceededType, metav1.ConditionFalse, remediationFailed}})
+					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
 				})
 			})
 
@@ -240,10 +283,15 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					Eventually(func() bool {
 						return plogs.Contains(fmt.Sprintf(invalidValueMachineAnnotationError, underTest.Name))
 					}, 30*time.Second, 1*time.Second).Should(BeTrue())
+
+					verifyConditionsMatch([]expectedCondition{
+						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationFailed},
+						{commonconditions.SucceededType, metav1.ConditionFalse, remediationFailed}})
+					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
 				})
 			})
 
-			When("node's machine annotation has incorrect value", func() {
+			When("machine pointed to by node's annotation does not exist", func() {
 				BeforeEach(func() {
 					underTest = createRemediation(masterNode)
 					masterNode.Annotations[machineAnnotationOpenshift] = "phantom-machine-namespace/phantom-machine-name"
@@ -254,6 +302,11 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					Eventually(func() bool {
 						return plogs.Contains(noMachineFoundError)
 					}, 30*time.Second, 1*time.Second).Should(BeTrue())
+
+					verifyConditionsMatch([]expectedCondition{
+						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationSkippedMachineNotFound},
+						{commonconditions.SucceededType, metav1.ConditionFalse, remediationSkippedMachineNotFound}})
+					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
 				})
 			})
 
@@ -266,6 +319,14 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					Eventually(func() bool {
 						return plogs.Contains("could not get Machine data from remediation")
 					}, 30*time.Second, 1*time.Second).Should(BeTrue())
+
+					verifyConditionsMatch([]expectedCondition{
+						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationFailed},
+						{commonconditions.SucceededType, metav1.ConditionFalse, remediationFailed}})
+					// This is not expected in a real scenario. The CR was created with a faulty annotation from the
+					// beginning. As a result, the first attempt to get the Machine is via CR's annotation, it fails,
+					// and the condition cannot be set. Normally, the first attempt is via Node's annotation instead.
+					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
 				})
 			})
 
@@ -282,6 +343,12 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					Eventually(func() bool {
 						return plogs.Contains(mockDeleteFailMessage)
 					}, "10s", "1s").Should(BeTrue())
+
+					verifyConditionsMatch([]expectedCondition{
+						{commonconditions.ProcessingType, metav1.ConditionTrue, remediationStarted},
+						{commonconditions.SucceededType, metav1.ConditionUnknown, remediationStarted},
+						// Cluster provider is not set in this test
+						{commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason}})
 				})
 			})
 
@@ -291,8 +358,13 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 				})
 
 				It("returns without completing remediation", func() {
-					verifyStatusCondition(commonconditions.ProcessingType, metav1.ConditionFalse)
-					verifyStatusCondition(commonconditions.SucceededType, metav1.ConditionFalse)
+					verifyConditionsMatch([]expectedCondition{
+						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationTimedOutByNhc},
+						{commonconditions.SucceededType, metav1.ConditionFalse, remediationTimedOutByNhc}})
+					// This is not expected in a real scenario. The CR was created with a faulty annotation from the
+					// beginning. As a result, the first attempt to get the Machine is via CR's annotation, it fails,
+					// and the condition cannot be set. Normally, the first attempt is via Node's annotation instead.
+					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
 				})
 			})
 		})
@@ -371,8 +443,9 @@ func deleteIgnoreNotFound() func(ctx context.Context, obj client.Object) error {
 	}
 }
 
-func verifyStatusCondition(conditionType string, conditionStatus metav1.ConditionStatus) {
-	By("Verify that Status.Conditions are correct")
+func verifyConditionMatches(conditionType string, conditionStatus metav1.ConditionStatus, reason conditionChangeReason) {
+	msg := fmt.Sprintf("Verifying that Condition '%v' is '%v' because '%v'", conditionType, conditionStatus, reason)
+	By(msg)
 
 	mdr := &v1alpha1.MachineDeletionRemediation{}
 	Eventually(func() string {
@@ -383,12 +456,33 @@ func verifyStatusCondition(conditionType string, conditionStatus metav1.Conditio
 		if gotCondition == nil {
 			return processingConditionNotSetError
 		}
-		if meta.IsStatusConditionPresentAndEqual(mdr.Status.Conditions, conditionType, conditionStatus) {
-			return processingConditionSetAndMatchSuccess
+		if !meta.IsStatusConditionPresentAndEqual(mdr.Status.Conditions, conditionType, conditionStatus) {
+			return processingConditionSetButNoMatchError
 		}
-		return processingConditionSetButNoMatchError
 
-	}, "20s", "1s").Should(Equal(processingConditionSetAndMatchSuccess), "'%v' status condition was expected to be %v", conditionType, conditionStatus)
+		if gotCondition.Reason != string(reason) {
+			return processingConditionSetButWrongReasonError
+		}
+
+		return processingConditionSetAndMatchSuccess
+	}, "20s", "1s").Should(Equal(processingConditionSetAndMatchSuccess), "'%v' status condition was expected to be %v and reason %v", conditionType, conditionStatus, reason)
+}
+
+func verifyConditionsMatch(expectedConditions []expectedCondition) {
+	for _, e := range expectedConditions {
+		verifyConditionMatches(e.conditionType, e.conditionStatus, e.conditionReason)
+	}
+}
+
+func verifyConditionUnset(conditionType string) {
+	msg := fmt.Sprintf("Verifying that Condition %v is unset", conditionType)
+	By(msg)
+	mdr := &v1alpha1.MachineDeletionRemediation{}
+	err := k8sClient.Get(context.Background(), client.ObjectKeyFromObject(underTest), mdr)
+	Expect(err).To(BeNil())
+
+	gotCondition := meta.FindStatusCondition(mdr.Status.Conditions, conditionType)
+	Expect(gotCondition).To(BeNil())
 }
 
 func setStopRemediationAnnotation() {

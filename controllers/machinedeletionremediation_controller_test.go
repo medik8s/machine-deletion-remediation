@@ -171,8 +171,8 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					// the actual MDR CR. For this reason the initial value is not
 					// tested here.
 					verifyConditionsMatch([]expectedCondition{
-						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationFinished},
-						{commonconditions.SucceededType, metav1.ConditionTrue, remediationFinished},
+						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationFinishedMachineDeleted},
+						{commonconditions.SucceededType, metav1.ConditionTrue, remediationFinishedMachineDeleted},
 						// Cluster provider is not set in this test
 						{commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason}})
 

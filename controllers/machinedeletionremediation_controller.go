@@ -70,7 +70,7 @@ type conditionChangeReason string
 const (
 	remediationStarted                  conditionChangeReason = "RemediationStarted"
 	remediationTimedOutByNhc            conditionChangeReason = "RemediationStoppedByNHC"
-	remediationFinished                 conditionChangeReason = "RemediationFinished"
+	remediationFinishedMachineDeleted   conditionChangeReason = "MachineDeleted"
 	remediationSkippedNodeNotFound      conditionChangeReason = "RemediationSkippedNodeNotFound"
 	remediationSkippedMachineNotFound   conditionChangeReason = "RemediationSkippedMachineNotFound"
 	remediationSkippedNoControllerOwner conditionChangeReason = "RemediationSkippedNoControllerOwner"
@@ -144,7 +144,7 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 			// finished. We return error only if updateConditions failed
 			var reason conditionChangeReason
 			if !mustExist {
-				reason = remediationFinished
+				reason = remediationFinishedMachineDeleted
 			} else if strings.Contains(err.Error(), noNodeFoundError) {
 				reason = remediationSkippedNodeNotFound
 			} else if strings.Contains(err.Error(), noMachineFoundError) {
@@ -378,7 +378,7 @@ func (r *MachineDeletionRemediationReconciler) updateConditions(reason condition
 	case remediationStarted:
 		processingConditionStatus = metav1.ConditionTrue
 		succeededConditionStatus = metav1.ConditionUnknown
-	case remediationFinished:
+	case remediationFinishedMachineDeleted:
 		processingConditionStatus = metav1.ConditionFalse
 		succeededConditionStatus = metav1.ConditionTrue
 	case remediationTimedOutByNhc,

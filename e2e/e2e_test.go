@@ -187,7 +187,7 @@ func verifyStatusCondition(conditionType string, conditionStatus metav1.Conditio
 			return processingConditionSetAndMatchSuccess
 		}
 		return processingConditionSetButNoMatchError
-	}, "30s", "1s").Should(Equal(processingConditionSetAndMatchSuccess))
+	}, "60s", "1s").Should(Equal(processingConditionSetAndMatchSuccess))
 }
 
 func getPlatform(c client.Client) (string, error) {

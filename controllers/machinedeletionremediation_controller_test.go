@@ -224,7 +224,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 				It("node not found error", func() {
 					Eventually(func() bool {
-						return plogs.Contains(noNodeFoundError)
+						return plogs.Contains(nodeNotFoundErrorMsg)
 					}, 30*time.Second, 1*time.Second).Should(BeTrue())
 
 					verifyConditionsMatch([]expectedCondition{
@@ -300,7 +300,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 				It("failed to fetch machine error", func() {
 					Eventually(func() bool {
-						return plogs.Contains(noMachineFoundError)
+						return plogs.Contains(machineNotFoundErrorMsg)
 					}, 30*time.Second, 1*time.Second).Should(BeTrue())
 
 					verifyConditionsMatch([]expectedCondition{

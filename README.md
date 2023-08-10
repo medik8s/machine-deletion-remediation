@@ -52,11 +52,6 @@ kind: MachineDeletionRemediation
 metadata:
   name: worker-0-21
   namespace: default
-  ownerReferences:
-    - kind: NodeHealthCheck
-      apiVersion: remediation.medik8s.io/v1alpha1
-      name: nodehealthcheck-sample
-      uid: 754189c9-b0d2-4894-bb2c-6adbdccb26f8
 spec: {}
 ```
 These CRs are created by NodeHealthCheck when it detects a failed node. 

@@ -128,7 +128,7 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 	nodeName := remediation.GetName()
 
 	if r.isTimedOutByNHC(remediation) {
-		log.Info("NHC stop requested")
+		log.Info("NHC time out annotation found, stopping remediation")
 		_, err = r.updateConditions(remediationTimedOutByNhc, remediation)
 		return ctrl.Result{}, err
 	}

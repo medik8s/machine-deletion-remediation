@@ -31,7 +31,6 @@ import (
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -170,21 +169,15 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 	// the Platform type. In case of BareMetal platform, the name is NOT
 	// expected to change, for other providers, instead, the name is expected
 	// to change.
-	// The providerID contains the platform type as prefix (e.g. baremetal:///...)
-	var providerID string
-	if providerID, err = getMachineProviderID(machine); err != nil {
-		log.Error(err, "could not get providerID")
-		return ctrl.Result{}, nil
-	}
-
 	var status metav1.ConditionStatus
 	var permanentNodeDeletionExpectedMsg string
 
-	if providerID == "" {
+	// The providerID contains the platform type as prefix (e.g. baremetal:///...)
+	if machine.Spec.ProviderID == nil || *machine.Spec.ProviderID == "" {
 		log.Info("Machine does not have ProviderID")
 		permanentNodeDeletionExpectedMsg = machineDeletedOnUnknownProviderMessage
 		status = metav1.ConditionUnknown
-	} else if strings.HasPrefix(providerID, "baremetal") {
+	} else if strings.HasPrefix(*machine.Spec.ProviderID, "baremetal") {
 		permanentNodeDeletionExpectedMsg = machineDeletedOnBareMetalProviderMessage
 		status = metav1.ConditionFalse
 	} else {
@@ -198,9 +191,8 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 	}
 
 	if !machine.GetDeletionTimestamp().IsZero() {
-		// Machine deletion requested already.
-		// Log deletion progress until the Machine exists
-		log.Info(postponedMachineDeletionInfo, "node", nodeName, "machine", machine.GetName(), "machine status.phase", getMachineStatusPhase(machine))
+		// Machine deletion requested already. Log deletion progress until the Machine exists
+		log.Info(postponedMachineDeletionInfo, "node", nodeName, "machine", machine.Name, "machine status.phase", machine.Status.Phase)
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
@@ -227,7 +219,7 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 	return ctrl.Result{Requeue: true}, nil
 }
 
-func hasControllerOwner(machine *unstructured.Unstructured) bool {
+func hasControllerOwner(machine *v1beta1.Machine) bool {
 	refs := machine.GetOwnerReferences()
 	for i := range refs {
 		if refs[i].Controller != nil && *refs[i].Controller {
@@ -273,7 +265,7 @@ func (r *MachineDeletionRemediationReconciler) getNodeFromMdr(mdr *v1alpha1.Mach
 // getMachine retrieves a machine from the cluster based on the remediation.
 // It returns the machine, a boolean indicating whether the machine was expected to be found,
 // and an error if any occurred during the retrieval process.
-func (r *MachineDeletionRemediationReconciler) getMachine(remediation *v1alpha1.MachineDeletionRemediation) (*unstructured.Unstructured, error) {
+func (r *MachineDeletionRemediationReconciler) getMachine(remediation *v1alpha1.MachineDeletionRemediation) (*v1beta1.Machine, error) {
 	// If the Machine's Name and Ns come from the related Node, it is expected
 	// to find the Machine in the cluster, while if its Name and Ns come from
 	// CR's annotation, the Machine might have been deleted upon our request.
@@ -304,10 +296,7 @@ func (r *MachineDeletionRemediationReconciler) getMachine(remediation *v1alpha1.
 		}
 	}
 
-	machine := new(unstructured.Unstructured)
-	machine.SetKind(machineKind)
-	machine.SetAPIVersion(v1beta1.SchemeGroupVersion.String())
-
+	machine := new(v1beta1.Machine)
 	key := client.ObjectKey{
 		Name:      machineName,
 		Namespace: machineNs,
@@ -478,60 +467,9 @@ func getMachineNameNsFromNode(node *v1.Node) (string, string, error) {
 	}
 	return "", "", fmt.Errorf(invalidValueMachineAnnotationError, node.Name)
 }
-
 func extractNameAndNamespace(nameNs string, nodeName string) (string, string, error) {
 	if nameNsSlice := strings.Split(nameNs, "/"); len(nameNsSlice) == 2 {
 		return nameNsSlice[1], nameNsSlice[0], nil
 	}
 	return "", "", fmt.Errorf(invalidValueMachineAnnotationError, nodeName)
-}
-
-func getMachineStatusPhase(machine *unstructured.Unstructured) string {
-	log := ctrl.Log.WithName("getMachineStatusPhase")
-
-	status, exists, err := unstructured.NestedMap(machine.Object, "status")
-	if err != nil {
-		log.Error(err, "could not get machine's status", "machine", machine.GetName())
-		return "unknown"
-	}
-	if !exists {
-		log.Info("machine does not have status", "machine", machine.GetName())
-		return "unknown"
-	}
-
-	phase, exists, err := unstructured.NestedString(status, "phase")
-	if err != nil {
-		log.Error(err, "could not get machine's status", "machine", machine.GetName())
-		return "unknown"
-	}
-	if !exists {
-		log.Info("machine does not have phase", "machine", machine.GetName())
-		return "unknown"
-	}
-	return phase
-}
-
-func getMachineProviderID(machine *unstructured.Unstructured) (string, error) {
-	log := ctrl.Log.WithName("getMachineStatusProviderID")
-
-	status, exists, err := unstructured.NestedMap(machine.Object, "spec")
-	if err != nil {
-		log.Error(err, "could not get machine's spec", "machine", machine.GetName())
-		return "", err
-	}
-	if !exists {
-		log.Info("machine does not have spec", "machine", machine.GetName())
-		return "", nil
-	}
-
-	providerID, exists, err := unstructured.NestedString(status, "providerID")
-	if err != nil {
-		log.Error(err, "could not get machine's providerID", "machine", machine.GetName())
-		return "", err
-	}
-	if !exists {
-		log.Info("machine does not have providerID", "machine", machine.GetName())
-		return "", nil
-	}
-	return providerID, nil
 }

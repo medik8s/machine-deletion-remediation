@@ -312,7 +312,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 			When("Remediation has incorrect annotation", func() {
 				BeforeEach(func() {
-					underTest = createRemediationWithAnnotation(masterNode, MachineNameNsAnnotation, "Gibberish")
+					underTest = createRemediationWithAnnotation(masterNode, MachineDataAnnotation, "Gibberish")
 				})
 
 				It("fails to follow machine deletion", func() {

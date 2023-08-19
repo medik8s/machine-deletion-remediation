@@ -92,6 +92,7 @@ type MachineDeletionRemediationReconciler struct {
 //+kubebuilder:rbac:groups=machine-deletion-remediation.medik8s.io,resources=machinedeletionremediations/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=machine-deletion-remediation.medik8s.io,resources=machinedeletionremediations/finalizers,verbs=update
 //+kubebuilder:rbac:groups=machine.openshift.io,resources=machines,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=machine.openshift.io,resources=machinesets,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -156,11 +157,27 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 
 		return ctrl.Result{}, err
 	}
-	if machine == nil {
-		// If there's no error and the machine is nil, assume it has been deleted upon our deletion
-		// request.
-		_, err = r.updateConditions(remediationFinishedMachineDeleted, remediation)
-		return ctrl.Result{}, nil
+
+	// machine is nil and no errors: we assume that the Machine was deleted successfully upon our request.
+	// Otherwise, there are two possibilities:
+	// 1. The machine is still to be deleted or pending deletion.
+	// 2. The machine was re-provisioned and it is newer than the remediation CR.
+	// If the latter, wait for the expected number of nodes to be restored before setting the Succeeded condition.
+	// NOTE: the Machine will always be nil after deletion if it changes name after re-provisioning, this is why we
+	// verify nodes count restoration even if machine == nil.
+	if machine == nil || machine.GetCreationTimestamp().After(remediation.GetCreationTimestamp().Time) {
+		if isRestored, err := r.isExpectedNodesNumberRestored(remediation); err != nil {
+			log.Error(err, "could not verify if node was restored")
+			if err == unrecoverableError {
+				return ctrl.Result{}, nil
+			}
+			return ctrl.Result{}, err
+		} else if isRestored {
+			_, err = r.updateConditions(remediationFinishedMachineDeleted, remediation)
+			return ctrl.Result{}, err
+		}
+		log.Info("waiting for the nodes count to be re-provisioned")
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
 	log.Info("node-associated machine found", "node", remediation.Name, "machine", machine.GetName())
@@ -458,6 +475,87 @@ func (r *MachineDeletionRemediationReconciler) isTimedOutByNHC(remediation *v1al
 	return false
 }
 
+// isExpectedNodesNumberRestored checks if the number of nodes associated to the MachineSet is equal to the
+// MachineSet's Replicas value
+func (r *MachineDeletionRemediationReconciler) isExpectedNodesNumberRestored(remediation *v1alpha1.MachineDeletionRemediation) (bool, error) {
+	_, namespace, owner, err := getMachineDataFromRemediation(remediation)
+	if err != nil {
+		return false, errors.Wrap(unrecoverableError, err.Error())
+	}
+
+	var machineSet *v1beta1.MachineSet
+	if machineSet, err = r.getMachineSet(owner, namespace); err != nil {
+		r.Log.Error(err, "could not get MachineSet", "machineSet", owner, "namespace", namespace)
+		return false, err
+	}
+
+	var nodes *v1.NodeList
+	if nodes, err = r.getMachineSetNodes(machineSet.Name); err != nil {
+		r.Log.Error(err, "could not get MachineSet's nodes", "machineSet", machineSet.Name)
+		return false, err
+	}
+
+	if machineSet.Spec.Replicas == nil {
+		msg := fmt.Sprintf("MachineSet '%s' does not have a Replicas value", machineSet.Name)
+		return false, errors.New(msg)
+	}
+
+	r.Log.Info("verifying nodes count restoration", "expected", *machineSet.Spec.Replicas, "actual", len(nodes.Items))
+	return len(nodes.Items) == int(*machineSet.Spec.Replicas), nil
+}
+
+// getMachineSet returns the MachineSet object given its name and namespace
+func (r *MachineDeletionRemediationReconciler) getMachineSet(name, namespace string) (*v1beta1.MachineSet, error) {
+	machineSet := new(v1beta1.MachineSet)
+	key := client.ObjectKey{
+		Name:      name,
+		Namespace: namespace,
+	}
+
+	if err := r.Get(context.Background(), key, machineSet); err != nil {
+		if apiErrors.IsNotFound(err) {
+			return nil, errors.Wrap(unrecoverableError, err.Error())
+		}
+		return nil, err
+	}
+	return machineSet, nil
+}
+
+// getMachineSetNodes returns the Nodes associated to the MachineSet
+func (r *MachineDeletionRemediationReconciler) getMachineSetNodes(machineSetName string) (*v1.NodeList, error) {
+	allNodes := new(v1.NodeList)
+	if err := r.List(context.Background(), allNodes); err != nil {
+		return nil, err
+	}
+
+	machineSetNodes := &v1.NodeList{}
+	for _, node := range allNodes.Items {
+		machineName, machineNs, err := getMachineNameNsFromNode(&node)
+		if err != nil {
+			r.Log.Error(err, "could not get MachineNameNS from Node", "node", node.Name)
+			continue
+		}
+
+		machine := v1beta1.Machine{}
+		key := client.ObjectKey{
+			Name:      machineName,
+			Namespace: machineNs,
+		}
+		if err := r.Get(context.TODO(), key, &machine); err != nil {
+			r.Log.Error(err, "could not get Machine of Node", "node", node.Name, "search key", key)
+			continue
+		}
+
+		if thisMachineSetName, err := getMachineOwnerReferenceName(&machine); err != nil {
+			r.Log.Error(err, "no valid ownerReference", "node", node.Name, "machine", machine.Name)
+		} else if thisMachineSetName == machineSetName {
+			machineSetNodes.Items = append(machineSetNodes.Items, node)
+		}
+	}
+
+	return machineSetNodes, nil
+}
+
 func getMachineNameNsFromNode(node *v1.Node) (string, string, error) {
 	var nodeAnnotations map[string]string
 	if nodeAnnotations = node.Annotations; nodeAnnotations == nil {
@@ -475,13 +573,14 @@ func getMachineNameNsFromNode(node *v1.Node) (string, string, error) {
 	return "", "", fmt.Errorf(invalidValueMachineAnnotationError, node.Name)
 }
 
-// getMachineOwner returns the Machine's ownerReference name. It returns an error if the Machine has no ownerReference
+// getMachineOwnerReferenceName returns the Machine's ownerReference name. It returns an error if the Machine has no ownerReference
 // or more than one.
 func getMachineOwnerReferenceName(machine *v1beta1.Machine) (string, error) {
 	owners := machine.GetOwnerReferences()
 	switch len(owners) {
 	case 0:
-		return "", fmt.Errorf("machine has no ownerReference")
+		// not an error, e.g. control-plane nodes in BareMetal clusters
+		return "", nil
 	case 1:
 		return owners[0].Name, nil
 	default:

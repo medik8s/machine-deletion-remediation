@@ -23,6 +23,7 @@ import (
 
 const (
 	defaultNamespace                                     = "default"
+	machineSetName                                       = "machine-set-x"
 	dummyMachine                                         = "dummy-machine"
 	workerNodeName, masterNodeName, noneExistingNodeName = "worker-node-x", "master-node-x", "phantom-node"
 	workerNodeMachineName, masterNodeMachineName         = "worker-node-x-machine", "master-node-x-machine"
@@ -45,6 +46,7 @@ type expectedCondition struct {
 
 var _ = Describe("Machine Deletion Remediation CR", func() {
 	var (
+		machineSet                           *v1beta1.MachineSet
 		workerNodeMachine, masterNodeMachine *v1beta1.Machine
 		workerNode, masterNode               *v1.Node
 		//phantomNode is never created by client
@@ -70,13 +72,16 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 	Context("Reconciliation", func() {
 		BeforeEach(func() {
 			plogs.Clear()
+			machineSet = createMachineSet(machineSetName)
 			workerNodeMachine, masterNodeMachine = createWorkerMachine(workerNodeMachineName), createMachine(masterNodeMachineName)
 			workerNode, masterNode, phantomNode = createNodeWithMachine(workerNodeName, workerNodeMachine), createNodeWithMachine(masterNodeName, masterNodeMachine), createNode(noneExistingNodeName)
 
+			DeferCleanup(k8sClient.Delete, machineSet)
 			DeferCleanup(k8sClient.Delete, masterNode)
 			DeferCleanup(k8sClient.Delete, workerNode)
 			DeferCleanup(k8sClient.Delete, masterNodeMachine)
 			DeferCleanup(deleteIgnoreNotFound(), workerNodeMachine)
+			Expect(k8sClient.Create(context.Background(), machineSet)).To(Succeed())
 			Expect(k8sClient.Create(context.Background(), masterNode)).To(Succeed())
 			Expect(k8sClient.Create(context.Background(), workerNode)).To(Succeed())
 			Expect(k8sClient.Create(context.Background(), masterNodeMachine)).To(Succeed())
@@ -165,19 +170,30 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					verifyMachineIsDeleted(workerNodeMachineName)
 					verifyMachineNotDeleted(masterNodeMachineName)
 
-					// The transition of the Processing Condition status from
-					// unset to "Started", and finally to "Finished" is too
-					// fast to test the initial value ("Started") by inspecting
-					// the actual MDR CR. For this reason the initial value is not
-					// tested here.
+					// Machine is deleted, but the remediation is not completed yet
+					verifyConditionsMatch([]expectedCondition{
+						{commonconditions.ProcessingType, metav1.ConditionTrue, remediationStarted},
+						{commonconditions.SucceededType, metav1.ConditionUnknown, remediationStarted},
+						// Cluster provider is not set in this test
+						{commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason}})
+
+					// Mock Machine and Node re-provisioning (even though this test does not actually delete the node, just the machine).
+					// 1. Create a Machine's replacement with a new name
+					// 2. Update WorkerNode's annotation to point to the new Machine
+					machineReplacementName := workerNodeMachineName + "-replacement"
+					workerNodeMachineReplacement := createWorkerMachine(machineReplacementName)
+					Expect(k8sClient.Create(context.Background(), workerNodeMachineReplacement)).To(Succeed())
+					DeferCleanup(k8sClient.Delete, workerNodeMachineReplacement)
+
+					workerNode.Annotations[machineAnnotationOpenshift] = fmt.Sprintf("%s/%s", defaultNamespace, machineReplacementName)
+					Expect(k8sClient.Update(context.Background(), workerNode)).To(Succeed())
+
+					// Now the remediation should be completed
 					verifyConditionsMatch([]expectedCondition{
 						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationFinishedMachineDeleted},
 						{commonconditions.SucceededType, metav1.ConditionTrue, remediationFinishedMachineDeleted},
 						// Cluster provider is not set in this test
 						{commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason}})
-
-					Expect(k8sClient.Get(context.Background(), client.ObjectKeyFromObject(underTest), underTest)).To(Succeed())
-					Expect(underTest.GetAnnotations()).ToNot(BeNil())
 				})
 			})
 
@@ -398,20 +414,32 @@ func createNode(nodeName string) *v1.Node {
 	return n
 }
 
-func createDummyMachine() *v1beta1.Machine {
-	return createMachine(dummyMachine)
+// createMachineSet creates a MachineSet with the given name and namespace.
+func createMachineSet(machineSetName string) *v1beta1.MachineSet {
+	machineSet := &v1beta1.MachineSet{}
+	machineSet.SetNamespace(defaultNamespace)
+	machineSet.SetName(machineSetName)
+	replicas := int32(1)
+	machineSet.Spec.Replicas = &replicas
+	return machineSet
 }
+
 func createMachine(machineName string) *v1beta1.Machine {
 	machine := &v1beta1.Machine{}
 	machine.SetNamespace(defaultNamespace)
 	machine.SetName(machineName)
 	return machine
 }
+
+func createDummyMachine() *v1beta1.Machine {
+	return createMachine(dummyMachine)
+}
+
 func createWorkerMachine(machineName string) *v1beta1.Machine {
 	controllerVal := true
 	machine := createMachine(machineName)
 	ref := metav1.OwnerReference{
-		Name:       "machineSetX",
+		Name:       machineSetName,
 		Kind:       machineSetKind,
 		UID:        "1234",
 		APIVersion: v1beta1.SchemeGroupVersion.String(),
@@ -465,7 +493,7 @@ func verifyConditionMatches(conditionType string, conditionStatus metav1.Conditi
 		}
 
 		return processingConditionSetAndMatchSuccess
-	}, "20s", "1s").Should(Equal(processingConditionSetAndMatchSuccess), "'%v' status condition was expected to be %v and reason %v", conditionType, conditionStatus, reason)
+	}, "60s", "1s").Should(Equal(processingConditionSetAndMatchSuccess), "'%v' status condition was expected to be %v and reason %v", conditionType, conditionStatus, reason)
 }
 
 func verifyConditionsMatch(expectedConditions []expectedCondition) {

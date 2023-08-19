@@ -146,6 +146,14 @@ spec:
           - update
           - watch
         - apiGroups:
+          - machine.openshift.io
+          resources:
+          - machinesets
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
           - authentication.k8s.io
           resources:
           - tokenreviews

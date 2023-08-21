@@ -24,6 +24,7 @@ import (
 const (
 	defaultNamespace                                     = "default"
 	machineSetName                                       = "machine-set-x"
+	machineSetKind                                       = "MachineSet"
 	dummyMachine                                         = "dummy-machine"
 	workerNodeName, masterNodeName, noneExistingNodeName = "worker-node-x", "master-node-x", "phantom-node"
 	workerNodeMachineName, masterNodeMachineName         = "worker-node-x-machine", "master-node-x-machine"
@@ -328,7 +329,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 			When("Remediation has incorrect annotation", func() {
 				BeforeEach(func() {
-					underTest = createRemediationWithAnnotation(masterNode, MachineDataAnnotation, "Gibberish")
+					underTest = createRemediationWithAnnotation(masterNode, MachineNameNsAnnotation, "Gibberish")
 				})
 
 				It("fails to follow machine deletion", func() {

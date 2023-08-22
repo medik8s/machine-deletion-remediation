@@ -145,7 +145,7 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 		return ctrl.Result{RequeueAfter: time.Second}, nil
 	}
 
-	machine, err := r.getMachine(remediation)
+	machine, err := r.getMachine(ctx, remediation)
 	if err != nil {
 		// Handling specific error scenarios. We avoid re-queue by returning nil after updating the
 		// conditions, as these are unrecoverable errors and re-queue would not change the
@@ -170,7 +170,7 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 	// NOTE: the Machine will always be nil after deletion if it changes name after re-provisioning, this is why we
 	// verify nodes count restoration even if machine == nil.
 	if machine == nil || machine.GetCreationTimestamp().After(remediation.GetCreationTimestamp().Time) {
-		if isRestored, err := r.isExpectedNodesNumberRestored(remediation); err != nil {
+		if isRestored, err := r.isExpectedNodesNumberRestored(ctx, remediation); err != nil {
 			log.Error(err, "could not verify if node was restored")
 			if err == unrecoverableError {
 				return ctrl.Result{}, nil
@@ -271,13 +271,13 @@ func (r *MachineDeletionRemediationReconciler) getRemediation(ctx context.Contex
 	return remediation, nil
 }
 
-func (r *MachineDeletionRemediationReconciler) getNodeFromMdr(mdr *v1alpha1.MachineDeletionRemediation) (*v1.Node, error) {
+func (r *MachineDeletionRemediationReconciler) getNodeFromMdr(ctx context.Context, mdr *v1alpha1.MachineDeletionRemediation) (*v1.Node, error) {
 	node := &v1.Node{}
 	key := client.ObjectKey{
 		Name: mdr.Name,
 	}
 
-	if err := r.Get(context.Background(), key, node); err != nil {
+	if err := r.Get(ctx, key, node); err != nil {
 		return nil, err
 	}
 	return node, nil
@@ -286,7 +286,7 @@ func (r *MachineDeletionRemediationReconciler) getNodeFromMdr(mdr *v1alpha1.Mach
 // getMachine retrieves a machine from the cluster based on the remediation.
 // It returns the machine, a boolean indicating whether the machine was expected to be found,
 // and an error if any occurred during the retrieval process.
-func (r *MachineDeletionRemediationReconciler) getMachine(remediation *v1alpha1.MachineDeletionRemediation) (*v1beta1.Machine, error) {
+func (r *MachineDeletionRemediationReconciler) getMachine(ctx context.Context, remediation *v1alpha1.MachineDeletionRemediation) (*v1beta1.Machine, error) {
 	// If the Machine's Name and Ns come from the related Node, it is expected
 	// to find the Machine in the cluster, while if its Name and Ns come from
 	// CR's annotation, the Machine might have been deleted upon our request.
@@ -302,7 +302,7 @@ func (r *MachineDeletionRemediationReconciler) getMachine(remediation *v1alpha1.
 		// and we expect to find the Node and the Machine in the cluster.
 		mustExist = true
 
-		node, err := r.getNodeFromMdr(remediation)
+		node, err := r.getNodeFromMdr(ctx, remediation)
 		if err != nil {
 			if apiErrors.IsNotFound(err) {
 				r.Log.Error(err, nodeNotFoundErrorMsg, "node name", remediation.Name)
@@ -322,7 +322,7 @@ func (r *MachineDeletionRemediationReconciler) getMachine(remediation *v1alpha1.
 		Namespace: machineNs,
 	}
 
-	if err := r.Get(context.TODO(), key, machine); err != nil {
+	if err := r.Get(ctx, key, machine); err != nil {
 		if !apiErrors.IsNotFound(err) {
 			return nil, err
 		}
@@ -484,7 +484,7 @@ func (r *MachineDeletionRemediationReconciler) isTimedOutByNHC(remediation *v1al
 
 // isExpectedNodesNumberRestored checks if the number of nodes associated to the Machine Owner is equal to the
 // Machine Owner's Replicas value
-func (r *MachineDeletionRemediationReconciler) isExpectedNodesNumberRestored(remediation *v1alpha1.MachineDeletionRemediation) (bool, error) {
+func (r *MachineDeletionRemediationReconciler) isExpectedNodesNumberRestored(ctx context.Context, remediation *v1alpha1.MachineDeletionRemediation) (bool, error) {
 	_, namespace, err := getRemediationDataFromAnnotation(remediation, MachineNameNsAnnotation)
 	if err != nil {
 		return false, errors.Wrap(unrecoverableError, err.Error())
@@ -495,13 +495,13 @@ func (r *MachineDeletionRemediationReconciler) isExpectedNodesNumberRestored(rem
 		return false, errors.Wrap(unrecoverableError, err.Error())
 	}
 
-	nodes, err := r.getMachineOwnerNodes(name)
+	nodes, err := r.getMachineOwnerNodes(ctx, name)
 	if err != nil {
 		r.Log.Error(err, "could not get Machine owner's nodes", "kind", kind, "name", name, "namespace", namespace)
 		return false, err
 	}
 
-	replicas, err := r.getMachineOwnerSpecReplicas(kind, name, namespace)
+	replicas, err := r.getMachineOwnerSpecReplicas(ctx, kind, name, namespace)
 	if err != nil {
 		r.Log.Error(err, "could not get Machine owner's Spec.Replicas", "kind", kind, "name", name, "namespace", namespace)
 		return false, err
@@ -512,7 +512,7 @@ func (r *MachineDeletionRemediationReconciler) isExpectedNodesNumberRestored(rem
 }
 
 // getMachineOwner returns the MachineSet object given its name and namespace
-func (r *MachineDeletionRemediationReconciler) getMachineOwner(kind, name, namespace string) (*unstructured.Unstructured, error) {
+func (r *MachineDeletionRemediationReconciler) getMachineOwner(ctx context.Context, kind, name, namespace string) (*unstructured.Unstructured, error) {
 	owner := &unstructured.Unstructured{}
 	owner.SetKind(kind)
 	owner.SetAPIVersion(machinev1beta1.GroupVersion.String())
@@ -521,7 +521,7 @@ func (r *MachineDeletionRemediationReconciler) getMachineOwner(kind, name, names
 		Namespace: namespace,
 	}
 
-	if err := r.Get(context.Background(), key, owner); err != nil {
+	if err := r.Get(ctx, key, owner); err != nil {
 		if apiErrors.IsNotFound(err) {
 			return nil, errors.Wrap(unrecoverableError, err.Error())
 		}
@@ -531,9 +531,9 @@ func (r *MachineDeletionRemediationReconciler) getMachineOwner(kind, name, names
 }
 
 // getMachineOwnerNodes returns the Nodes associated to the Machine's Owner
-func (r *MachineDeletionRemediationReconciler) getMachineOwnerNodes(ownerName string) ([]v1.Node, error) {
+func (r *MachineDeletionRemediationReconciler) getMachineOwnerNodes(ctx context.Context, ownerName string) ([]v1.Node, error) {
 	allNodes := &v1.NodeList{}
-	if err := r.List(context.Background(), allNodes); err != nil {
+	if err := r.List(ctx, allNodes); err != nil {
 		return nil, err
 	}
 
@@ -550,7 +550,7 @@ func (r *MachineDeletionRemediationReconciler) getMachineOwnerNodes(ownerName st
 			Name:      machineName,
 			Namespace: machineNs,
 		}
-		if err := r.Get(context.TODO(), key, &machine); err != nil {
+		if err := r.Get(ctx, key, &machine); err != nil {
 			r.Log.Error(err, "could not get Machine of Node", "node", node.Name, "search key", key)
 			continue
 		}
@@ -598,8 +598,8 @@ func getMachineOwnerNameKind(machine *v1beta1.Machine) (name, kind string, err e
 }
 
 // getMachineOwnerSpecReplicas returns the Machine's owner Spec.Replicas field
-func (r *MachineDeletionRemediationReconciler) getMachineOwnerSpecReplicas(kind, name, namespace string) (int, error) {
-	owner, err := r.getMachineOwner(kind, name, namespace)
+func (r *MachineDeletionRemediationReconciler) getMachineOwnerSpecReplicas(ctx context.Context, kind, name, namespace string) (int, error) {
+	owner, err := r.getMachineOwner(ctx, kind, name, namespace)
 	if err != nil {
 		r.Log.Error(err, "could not get Machine owner", "kind", kind, "name", name, "namespace", namespace)
 		if apiErrors.IsNotFound(err) {

@@ -45,7 +45,6 @@ import (
 
 const (
 	machineAnnotationOpenshift = "machine.openshift.io/machine"
-	machineKind                = "Machine"
 	// MachineNameNsAnnotation contains to-be-deleted Machine's Name and Namespace
 	MachineNameNsAnnotation = "machine-deletion-remediation.medik8s.io/machineNameNamespace"
 	// MachineOwnerAnnotation contains Machine's ownerReference name and Kind

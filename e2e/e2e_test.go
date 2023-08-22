@@ -60,6 +60,7 @@ var _ = Describe("E2E tests", func() {
 				Expect(len(initialWorkers.Items)).To(BeNumerically(">=", 2))
 				node = &initialWorkers.Items[0]
 				machine = getAssociatedMachine(node)
+				Expect(machine).NotTo(BeNil())
 
 				var err error
 				platform, err = getPlatform(k8sClient)
@@ -78,7 +79,7 @@ var _ = Describe("E2E tests", func() {
 
 			It("deletes the associated Machine", func() {
 				By("checking the Status condition Processing is True before machine deletion")
-				verifyStatusCondition(commonconditions.ProcessingType, metav1.ConditionTrue)
+				verifyConditionMatches(commonconditions.ProcessingType, metav1.ConditionTrue)
 
 				By("checking the Machine was deleted")
 				Eventually(func() bool {
@@ -87,16 +88,15 @@ var _ = Describe("E2E tests", func() {
 					return errors.IsNotFound(err)
 				}, "5m", "10s").Should(BeTrue())
 
-				By("checking the Status condition Processing is False after machine deletion")
-				verifyStatusCondition(commonconditions.ProcessingType, metav1.ConditionFalse)
-				By("checking the Status condition Succeeded is True after machine deletion")
-				verifyStatusCondition(commonconditions.SucceededType, metav1.ConditionTrue)
+				By("checking the Status condition Processing is still True after machine deletion")
+				verifyConditionMatches(commonconditions.ProcessingType, metav1.ConditionTrue)
+
 				msg := fmt.Sprintf("checking the Status condition PermanentNodeDeletionExpected to be False on platform BareMetal, True otherwise (this platform is %s)", platform)
 				By(msg)
 				if platform == "BareMetal" {
-					verifyStatusCondition(commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionFalse)
+					verifyConditionMatches(commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionFalse)
 				} else {
-					verifyStatusCondition(commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionTrue)
+					verifyConditionMatches(commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionTrue)
 				}
 
 				By("checking a new Node and the Machine associated were created after the CR")
@@ -117,9 +117,15 @@ var _ = Describe("E2E tests", func() {
 					g.Expect(newNode).NotTo(BeNil())
 
 					newMachine := getAssociatedMachine(newNode)
+					g.Expect(newMachine).NotTo(BeNil())
 					g.Expect(newMachine.GetUID()).ShouldNot(Equal(machine.GetUID()))
 					g.Expect(newMachine.GetCreationTimestamp().Time).Should(BeTemporally(">=", mdr.GetCreationTimestamp().Time))
 				}, "15m", "10s").Should(Succeed())
+
+				By("checking the Status condition Processing is False after node re-provision")
+				verifyConditionMatches(commonconditions.ProcessingType, metav1.ConditionFalse)
+				By("checking the Status condition Succeeded is True after node re-provision")
+				verifyConditionMatches(commonconditions.SucceededType, metav1.ConditionTrue)
 			})
 		})
 	})
@@ -135,6 +141,9 @@ func createMachineStruct() *unstructured.Unstructured {
 
 func getAssociatedMachine(node *v1.Node) *unstructured.Unstructured {
 	parts := strings.Split(node.GetAnnotations()[machineAnnotationOpenshift], "/")
+	if len(parts) != 2 {
+		return nil
+	}
 	machineNamespace := parts[0]
 	machineName := parts[1]
 	key := client.ObjectKey{
@@ -172,14 +181,13 @@ func deleteRemediation(mdr *v1alpha1.MachineDeletionRemediation) {
 	}, timeout, pollInterval).ShouldNot(HaveOccurred(), "failed to delete mdr")
 }
 
-func verifyStatusCondition(conditionType string, conditionStatus metav1.ConditionStatus) {
+func verifyConditionMatches(conditionType string, conditionStatus metav1.ConditionStatus) {
 
-	var gotCondition *metav1.Condition
 	Eventually(func() string {
 		if err := k8sClient.Get(context.Background(), client.ObjectKeyFromObject(mdr), mdr); err != nil {
 			return noMachineDeletionRemediationCRFound
 		}
-		gotCondition = meta.FindStatusCondition(mdr.Status.Conditions, conditionType)
+		gotCondition := meta.FindStatusCondition(mdr.Status.Conditions, conditionType)
 		if gotCondition == nil {
 			return processingConditionNotSetError
 		}

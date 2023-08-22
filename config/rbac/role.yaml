@@ -41,6 +41,14 @@ rules:
 - apiGroups:
   - machine.openshift.io
   resources:
+  - controlplanemachinesets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - machine.openshift.io
+  resources:
   - machines
   verbs:
   - create
@@ -49,4 +57,12 @@ rules:
   - list
   - patch
   - update
+  - watch
+- apiGroups:
+  - machine.openshift.io
+  resources:
+  - machinesets
+  verbs:
+  - get
+  - list
   - watch

@@ -155,6 +155,14 @@ spec:
         - apiGroups:
           - machine.openshift.io
           resources:
+          - controlplanemachinesets
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - machine.openshift.io
+          resources:
           - machines
           verbs:
           - create
@@ -163,6 +171,14 @@ spec:
           - list
           - patch
           - update
+          - watch
+        - apiGroups:
+          - machine.openshift.io
+          resources:
+          - machinesets
+          verbs:
+          - get
+          - list
           - watch
         - apiGroups:
           - authentication.k8s.io

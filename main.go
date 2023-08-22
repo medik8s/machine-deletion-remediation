@@ -35,6 +35,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+
 	appv1alpha1 "github.com/medik8s/machine-deletion-remediation/api/v1alpha1"
 	"github.com/medik8s/machine-deletion-remediation/controllers"
 	"github.com/medik8s/machine-deletion-remediation/version"
@@ -48,8 +50,8 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
 	utilruntime.Must(appv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(machinev1beta1.Install(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 

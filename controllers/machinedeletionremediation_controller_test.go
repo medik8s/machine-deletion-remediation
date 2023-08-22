@@ -59,8 +59,8 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 			underTest = &v1alpha1.MachineDeletionRemediation{
 				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: defaultNamespace},
 			}
-			DeferCleanup(k8sClient.Delete, underTest)
 			Expect(k8sClient.Create(context.Background(), underTest)).To(Succeed())
+			DeferCleanup(k8sClient.Delete, underTest)
 		})
 
 		When("creating a resource", func() {
@@ -77,21 +77,21 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 			workerNodeMachine, masterNodeMachine = createWorkerMachine(workerNodeMachineName), createMachine(masterNodeMachineName)
 			workerNode, masterNode, phantomNode = createNodeWithMachine(workerNodeName, workerNodeMachine), createNodeWithMachine(masterNodeName, masterNodeMachine), createNode(noneExistingNodeName)
 
-			DeferCleanup(k8sClient.Delete, machineSet)
-			DeferCleanup(k8sClient.Delete, masterNode)
-			DeferCleanup(k8sClient.Delete, workerNode)
-			DeferCleanup(k8sClient.Delete, masterNodeMachine)
-			DeferCleanup(deleteIgnoreNotFound(), workerNodeMachine)
 			Expect(k8sClient.Create(context.Background(), machineSet)).To(Succeed())
 			Expect(k8sClient.Create(context.Background(), masterNode)).To(Succeed())
 			Expect(k8sClient.Create(context.Background(), workerNode)).To(Succeed())
 			Expect(k8sClient.Create(context.Background(), masterNodeMachine)).To(Succeed())
 			Expect(k8sClient.Create(context.Background(), workerNodeMachine)).To(Succeed())
+			DeferCleanup(k8sClient.Delete, machineSet)
+			DeferCleanup(k8sClient.Delete, masterNode)
+			DeferCleanup(k8sClient.Delete, workerNode)
+			DeferCleanup(k8sClient.Delete, masterNodeMachine)
+			DeferCleanup(deleteIgnoreNotFound(), workerNodeMachine)
 		})
 
 		JustBeforeEach(func() {
-			DeferCleanup(k8sClient.Delete, underTest)
 			Expect(k8sClient.Create(context.Background(), underTest)).To(Succeed())
+			DeferCleanup(k8sClient.Delete, underTest)
 		})
 
 		Context("Sunny Flows", func() {

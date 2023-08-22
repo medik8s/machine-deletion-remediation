@@ -494,7 +494,7 @@ func verifyConditionMatches(conditionType string, conditionStatus metav1.Conditi
 		}
 
 		return processingConditionSetAndMatchSuccess
-	}, "60s", "1s").Should(Equal(processingConditionSetAndMatchSuccess), "'%v' status condition was expected to be %v and reason %v", conditionType, conditionStatus, reason)
+	}, "60s", "10s").Should(Equal(processingConditionSetAndMatchSuccess), "'%v' status condition was expected to be %v and reason %v", conditionType, conditionStatus, reason)
 }
 
 func verifyConditionsMatch(expectedConditions []expectedCondition) {

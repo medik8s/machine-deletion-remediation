@@ -159,23 +159,16 @@ fix-imports: sort-imports ## Sort imports
 verify-no-changes: ## verify no there are no un-staged changes
 	./hack/verify-diff.sh
 
-.PHONY: fetch-mutation
-fetch-mutation: ## fetch mutation package.
-	GO111MODULE=off go get -t -v github.com/mshitrit/go-mutesting/...
-
 # Run tests
 # Use TEST_OPS to pass further options to `go test` (e.g. verbosity and/or -ginkgo.focus)
 export TEST_OPS ?= ""
 .PHONY: test
-test: manifests generate go-verify fmt vet test-imports envtest ## Generate and format code, run tests, generate manifests and bundle
+test: test-no-verify-changes verify-no-changes ## Run tests and verify no changes
+
+.PHONY: test-no-verify-changes
+test-no-verify-changes: manifests generate go-verify fmt vet test-imports envtest ## Generate and format code, run tests, generate manifests and bundle
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path  --bin-dir $(PROJECT_DIR)/testbin)" \
-		go test ./controllers/... -coverprofile cover.out ${TEST_OPS}
-
-.PHONY: test-mutation
-test-mutation: verify-no-changes fetch-mutation ## Run mutation tests in manual mode.
-	echo -e "## Verifying diff ## \n##Mutations tests actually changes the code while running - this is a safeguard in order to be able to easily revert mutation tests changes (in case mutation tests have not completed properly)##"
-	./hack/test-mutation.sh
-
+	go test ./controllers/... -coverprofile cover.out ${TEST_OPS}
 
 .PHONY: test-e2e
 test-e2e: ## Run end to end tests
@@ -365,7 +358,3 @@ container-build: ## Build containers
 .PHONY: container-push
 container-push:  ## Push containers (NOTE: catalog can't be build before bundle was pushed)
 	make docker-push bundle-push catalog-build catalog-push
-
-.PHONY: test-mutation-ci
-test-mutation-ci: fetch-mutation ## Run mutation tests as part of auto build process.
-	./hack/test-mutation.sh

@@ -10,26 +10,7 @@ metadata:
           "metadata": {
             "name": "machinedeletionremediation-sample"
           },
-          "spec": {},
-          "status": {
-            "conditions": [
-              {
-                "reason": "RemediationFinished",
-                "status": false,
-                "type": "Processing"
-              },
-              {
-                "reason": "RemediationFinished",
-                "status": true,
-                "type": "Succeeded"
-              },
-              {
-                "reason": "MachineDeletionOnBareMetalProviderReason",
-                "status": false,
-                "type": "PermanentNodeDeletionExpected"
-              }
-            ]
-          }
+          "spec": {}
         },
         {
           "apiVersion": "machine-deletion-remediation.medik8s.io/v1alpha1",

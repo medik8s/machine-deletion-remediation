@@ -3,14 +3,3 @@ kind: MachineDeletionRemediation
 metadata:
   name: machinedeletionremediation-sample
 spec: {}
-status:
-  conditions:
-  - type: Processing
-    status: false
-    reason: RemediationFinished
-  - type: Succeeded
-    status: true
-    reason: RemediationFinished
-  - type: PermanentNodeDeletionExpected
-    status: false
-    reason: MachineDeletionOnBareMetalProviderReason

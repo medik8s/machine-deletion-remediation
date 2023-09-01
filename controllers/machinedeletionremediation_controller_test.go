@@ -16,7 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/openshift/api/machine/v1beta1"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 
 	"github.com/medik8s/machine-deletion-remediation/api/v1alpha1"
 )
@@ -47,8 +47,8 @@ type expectedCondition struct {
 
 var _ = Describe("Machine Deletion Remediation CR", func() {
 	var (
-		machineSet                           *v1beta1.MachineSet
-		workerNodeMachine, masterNodeMachine *v1beta1.Machine
+		machineSet                           *machinev1beta1.MachineSet
+		workerNodeMachine, masterNodeMachine *machinev1beta1.Machine
 		workerNode, masterNode               *v1.Node
 		//phantomNode is never created by client
 		phantomNode *v1.Node
@@ -403,7 +403,7 @@ func createRemediationWithAnnotation(node *v1.Node, key, annotation string) *v1a
 	return mdr
 }
 
-func createNodeWithMachine(nodeName string, machine *v1beta1.Machine) *v1.Node {
+func createNodeWithMachine(nodeName string, machine *machinev1beta1.Machine) *v1.Node {
 	n := createNode(nodeName)
 	n.Annotations[machineAnnotationOpenshift] = fmt.Sprintf("%s/%s", machine.GetNamespace(), machine.GetName())
 	return n
@@ -416,8 +416,8 @@ func createNode(nodeName string) *v1.Node {
 }
 
 // createMachineSet creates a MachineSet with the given name and namespace.
-func createMachineSet(machineSetName string) *v1beta1.MachineSet {
-	machineSet := &v1beta1.MachineSet{}
+func createMachineSet(machineSetName string) *machinev1beta1.MachineSet {
+	machineSet := &machinev1beta1.MachineSet{}
 	machineSet.SetNamespace(defaultNamespace)
 	machineSet.SetName(machineSetName)
 	replicas := int32(1)
@@ -425,25 +425,25 @@ func createMachineSet(machineSetName string) *v1beta1.MachineSet {
 	return machineSet
 }
 
-func createMachine(machineName string) *v1beta1.Machine {
-	machine := &v1beta1.Machine{}
+func createMachine(machineName string) *machinev1beta1.Machine {
+	machine := &machinev1beta1.Machine{}
 	machine.SetNamespace(defaultNamespace)
 	machine.SetName(machineName)
 	return machine
 }
 
-func createDummyMachine() *v1beta1.Machine {
+func createDummyMachine() *machinev1beta1.Machine {
 	return createMachine(dummyMachine)
 }
 
-func createWorkerMachine(machineName string) *v1beta1.Machine {
+func createWorkerMachine(machineName string) *machinev1beta1.Machine {
 	controllerVal := true
 	machine := createMachine(machineName)
 	ref := metav1.OwnerReference{
 		Name:       machineSetName,
 		Kind:       machineSetKind,
 		UID:        "1234",
-		APIVersion: v1beta1.SchemeGroupVersion.String(),
+		APIVersion: machinev1beta1.SchemeGroupVersion.String(),
 		Controller: &controllerVal,
 	}
 	machine.SetOwnerReferences([]metav1.OwnerReference{ref})
@@ -532,7 +532,7 @@ func setStopRemediationAnnotation() {
 	Expect(k8sClient.Update(context.Background(), underTest)).ToNot(HaveOccurred())
 }
 
-func setMachineProviderID(machine *v1beta1.Machine, providerID string) {
+func setMachineProviderID(machine *machinev1beta1.Machine, providerID string) {
 	EventuallyWithOffset(1, func(g Gomega) {
 		g.Expect(k8sClient.Get(context.Background(), client.ObjectKeyFromObject(machine), machine)).To(Succeed())
 	})

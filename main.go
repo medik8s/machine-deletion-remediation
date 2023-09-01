@@ -34,7 +34,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
+	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 
 	appv1alpha1 "github.com/medik8s/machine-deletion-remediation/api/v1alpha1"
@@ -51,6 +53,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(appv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(machinev1.Install(scheme))
 	utilruntime.Must(machinev1beta1.Install(scheme))
 	//+kubebuilder:scaffold:scheme
 }
@@ -75,10 +78,13 @@ func main() {
 
 	printVersion()
 
+	metricOpts := server.Options{
+		BindAddress: metricsAddr,
+	}
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
+		Metrics:                metricOpts,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "285d4098.example.com",

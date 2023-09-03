@@ -79,11 +79,26 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 	Context("Reconciliation", func() {
 		BeforeEach(func() {
 			plogs.Clear()
+
 			machineSet = createMachineSet(machineSetName)
 			cpms = createControlPlaneMachineSet(cpmsName)
-			workerNodeMachine, masterNodeMachine = createWorkerMachine(workerNodeMachineName), createMachine(masterNodeMachineName)
+
+			workerNodeMachine = createMachineWithOwner(workerNodeMachineName, machineSet)
+			masterNodeMachine = createMachine(masterNodeMachineName)
 			cpNodeMachine = createMachineWithOwner(cpNodeMachineName, cpms)
-			workerNode, masterNode, phantomNode = createNodeWithMachine(workerNodeName, workerNodeMachine), createNodeWithMachine(masterNodeName, masterNodeMachine), createNode(noneExistingNodeName)
+
+			workerNode, masterNode, phantomNode =
+				createNodeWithMachine(workerNodeName, workerNodeMachine),
+				createNodeWithMachine(masterNodeName, masterNodeMachine),
+				createNode(noneExistingNodeName)
+
+			// CPMS's ReplicaSet has minimum value of 3, so we need 3 CP nodes
+			for i := 0; i < 3; i++ {
+				cpNode := createNodeWithMachine(fmt.Sprintf("%s-%d", cpNodeWithOwnerName, i), cpNodeMachine)
+				cpNodeWithOwnerList = append(cpNodeWithOwnerList, *cpNode)
+				Expect(k8sClient.Create(context.Background(), cpNode)).To(Succeed())
+				DeferCleanup(k8sClient.Delete, cpNode)
+			}
 
 			Expect(k8sClient.Create(context.Background(), machineSet)).To(Succeed())
 			Expect(k8sClient.Create(context.Background(), cpms)).To(Succeed())
@@ -98,16 +113,11 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 			DeferCleanup(k8sClient.Delete, masterNode)
 			DeferCleanup(k8sClient.Delete, workerNode)
 			DeferCleanup(k8sClient.Delete, masterNodeMachine)
+
+			// cpNodeMachine and workerNodeMachine are expected to be deleted in some tests
+			// so do not error if they are not found
 			DeferCleanup(deleteIgnoreNotFound(), cpNodeMachine)
 			DeferCleanup(deleteIgnoreNotFound(), workerNodeMachine)
-
-			// CPMS ReplicaSet minumum value is 3, so we need 3 CP nodes
-			for i := 0; i < 3; i++ {
-				cpNode := createNodeWithMachine(fmt.Sprintf("%s-%d", cpNodeWithOwnerName, i), cpNodeMachine)
-				cpNodeWithOwnerList = append(cpNodeWithOwnerList, *cpNode)
-				Expect(k8sClient.Create(context.Background(), cpNode)).To(Succeed())
-				DeferCleanup(k8sClient.Delete, cpNode)
-			}
 		})
 
 		JustBeforeEach(func() {
@@ -243,7 +253,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					// 1. Create a Machine's replacement with a new name
 					// 2. Update WorkerNode's annotation to point to the new Machine
 					machineReplacementName := workerNodeMachineName + "-replacement"
-					workerNodeMachineReplacement := createWorkerMachine(machineReplacementName)
+					workerNodeMachineReplacement := createMachineWithOwner(machineReplacementName, machineSet)
 					Expect(k8sClient.Create(context.Background(), workerNodeMachineReplacement)).To(Succeed())
 					DeferCleanup(k8sClient.Delete, workerNodeMachineReplacement)
 
@@ -559,20 +569,6 @@ func createMachineWithOwner(machineName string, owner metav1.Object) *machinev1b
 
 func createDummyMachine() *machinev1beta1.Machine {
 	return createMachine(dummyMachine)
-}
-
-func createWorkerMachine(machineName string) *machinev1beta1.Machine {
-	controllerVal := true
-	machine := createMachine(machineName)
-	ref := metav1.OwnerReference{
-		Name:       machineSetName,
-		Kind:       machineSetKind,
-		UID:        "1234",
-		APIVersion: machinev1beta1.SchemeGroupVersion.String(),
-		Controller: &controllerVal,
-	}
-	machine.SetOwnerReferences([]metav1.OwnerReference{ref})
-	return machine
 }
 
 func verifyMachineNotDeleted(machineName string) {

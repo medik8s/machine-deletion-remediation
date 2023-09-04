@@ -143,8 +143,8 @@ var _ = BeforeSuite(func() {
 		Expect(err).ToNot(HaveOccurred())
 	}()
 
-	machinev1.AddToScheme(cclient.Scheme())
-	machinev1beta1.AddToScheme(cclient.Scheme())
+	Expect(machinev1.AddToScheme(cclient.Scheme())).ToNot(HaveOccurred())
+	Expect(machinev1beta1.AddToScheme(cclient.Scheme())).ToNot(HaveOccurred())
 })
 
 var _ = AfterSuite(func() {

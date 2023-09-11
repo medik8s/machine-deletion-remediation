@@ -37,7 +37,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/openshift/api/machine/v1beta1"
+	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 
 	"github.com/medik8s/machine-deletion-remediation/api/v1alpha1"
@@ -239,7 +239,7 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 	return ctrl.Result{Requeue: true}, nil
 }
 
-func hasControllerOwner(machine *v1beta1.Machine) bool {
+func hasControllerOwner(machine *machinev1beta1.Machine) bool {
 	refs := machine.GetOwnerReferences()
 	for i := range refs {
 		if refs[i].Controller != nil && *refs[i].Controller {
@@ -285,7 +285,7 @@ func (r *MachineDeletionRemediationReconciler) getNodeFromMdr(ctx context.Contex
 // getMachine retrieves a machine from the cluster based on the remediation.
 // It returns the machine, a boolean indicating whether the machine was expected to be found,
 // and an error if any occurred during the retrieval process.
-func (r *MachineDeletionRemediationReconciler) getMachine(ctx context.Context, remediation *v1alpha1.MachineDeletionRemediation) (*v1beta1.Machine, error) {
+func (r *MachineDeletionRemediationReconciler) getMachine(ctx context.Context, remediation *v1alpha1.MachineDeletionRemediation) (*machinev1beta1.Machine, error) {
 	// If the Machine's Name and Ns come from the related Node, it is expected
 	// to find the Machine in the cluster, while if its Name and Ns come from
 	// CR's annotation, the Machine might have been deleted upon our request.
@@ -315,7 +315,7 @@ func (r *MachineDeletionRemediationReconciler) getMachine(ctx context.Context, r
 		}
 	}
 
-	machine := &v1beta1.Machine{}
+	machine := &machinev1beta1.Machine{}
 	key := client.ObjectKey{
 		Name:      machineName,
 		Namespace: machineNs,
@@ -339,7 +339,7 @@ func (r *MachineDeletionRemediationReconciler) getMachine(ctx context.Context, r
 }
 
 // saveMachineData saves target Machine data in a remediation's annotation
-func (r *MachineDeletionRemediationReconciler) saveMachineData(ctx context.Context, remediation *v1alpha1.MachineDeletionRemediation, machine *v1beta1.Machine) error {
+func (r *MachineDeletionRemediationReconciler) saveMachineData(ctx context.Context, remediation *v1alpha1.MachineDeletionRemediation, machine *machinev1beta1.Machine) error {
 	annotations := remediation.GetAnnotations()
 	if annotations == nil {
 		annotations = make(map[string]string, 1)
@@ -512,9 +512,21 @@ func (r *MachineDeletionRemediationReconciler) isExpectedNodesNumberRestored(ctx
 
 // getMachineOwner returns the MachineSet object given its name and namespace
 func (r *MachineDeletionRemediationReconciler) getMachineOwner(ctx context.Context, kind, name, namespace string) (*unstructured.Unstructured, error) {
+	kindToApiVersionMap := map[string]string{
+		"MachineSet":             machinev1beta1.GroupVersion.String(),
+		"ControlPlaneMachineSet": machinev1.GroupVersion.String(),
+	}
+
+	apiVersion, exists := kindToApiVersionMap[kind]
+	if !exists {
+		return nil, errors.Wrap(unrecoverableError, fmt.Sprintf("unknown kind %s", kind))
+	}
+
+	r.Log.Info("getting Machine owner", "kind", kind, "name", name, "namespace", namespace, "apiVersion", apiVersion)
+
 	owner := &unstructured.Unstructured{}
 	owner.SetKind(kind)
-	owner.SetAPIVersion(machinev1beta1.GroupVersion.String())
+	owner.SetAPIVersion(apiVersion)
 	key := client.ObjectKey{
 		Name:      name,
 		Namespace: namespace,
@@ -544,7 +556,7 @@ func (r *MachineDeletionRemediationReconciler) getMachineOwnerNodes(ctx context.
 			continue
 		}
 
-		machine := v1beta1.Machine{}
+		machine := machinev1beta1.Machine{}
 		key := client.ObjectKey{
 			Name:      machineName,
 			Namespace: machineNs,
@@ -583,7 +595,7 @@ func getMachineNameNsFromNode(node *v1.Node) (string, string, error) {
 
 // getMachineOwnerNameKind returns the Machine's ownerReference name and Kind. It returns an error if the Machine has
 // more than one Owner Reference.
-func getMachineOwnerNameKind(machine *v1beta1.Machine) (name, kind string, err error) {
+func getMachineOwnerNameKind(machine *machinev1beta1.Machine) (name, kind string, err error) {
 	owners := machine.GetOwnerReferences()
 	switch len(owners) {
 	case 0:

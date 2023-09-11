@@ -32,7 +32,8 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/openshift/api/machine/v1beta1"
+	machinev1 "github.com/openshift/api/machine/v1"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 
 	"github.com/medik8s/machine-deletion-remediation/api/v1alpha1"
 	//+kubebuilder:scaffold:imports
@@ -104,6 +105,7 @@ var _ = BeforeSuite(func() {
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{
 			filepath.Join("..", "config", "crd", "bases"),
+			filepath.Join("..", "vendor", "github.com", "openshift", "api", "machine", "v1"),
 			filepath.Join("..", "vendor", "github.com", "openshift", "api", "machine", "v1beta1"),
 		},
 		ErrorIfCRDPathMissing: true,
@@ -112,9 +114,6 @@ var _ = BeforeSuite(func() {
 	cfg, err := testEnv.Start()
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
-
-	err = v1alpha1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
 
 	err = v1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
@@ -144,7 +143,8 @@ var _ = BeforeSuite(func() {
 		Expect(err).ToNot(HaveOccurred())
 	}()
 
-	v1beta1.AddToScheme(cclient.Scheme())
+	Expect(machinev1.AddToScheme(cclient.Scheme())).ToNot(HaveOccurred())
+	Expect(machinev1beta1.AddToScheme(cclient.Scheme())).ToNot(HaveOccurred())
 })
 
 var _ = AfterSuite(func() {

@@ -25,6 +25,7 @@ import (
 	"github.com/go-logr/logr"
 	commonannotations "github.com/medik8s/common/pkg/annotations"
 	commonconditions "github.com/medik8s/common/pkg/conditions"
+	commonevents "github.com/medik8s/common/pkg/events"
 	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
@@ -34,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -74,7 +76,7 @@ const (
 	remediationSkippedNodeNotFound      conditionChangeReason = "RemediationSkippedNodeNotFound"
 	remediationSkippedMachineNotFound   conditionChangeReason = "RemediationSkippedMachineNotFound"
 	remediationSkippedNoControllerOwner conditionChangeReason = "RemediationSkippedNoControllerOwner"
-	remediationFailed                   conditionChangeReason = "remediationFailed"
+	remediationFailed                   conditionChangeReason = "RemediationFailed"
 )
 
 var (
@@ -86,8 +88,9 @@ var (
 // MachineDeletionRemediationReconciler reconciles a MachineDeletionRemediation object
 type MachineDeletionRemediationReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	Log      logr.Logger
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 //+kubebuilder:rbac:groups=machine-deletion-remediation.medik8s.io,resources=machinedeletionremediations,verbs=get;list;watch;create;update;patch;delete
@@ -127,12 +130,14 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 			finalResult.RequeueAfter = time.Second
 		}
 	}()
+	commonevents.RemediationStarted(r.Recorder, remediation)
 
 	// Remediation's name was created from Node's name
 	nodeName := remediation.GetName()
 
 	if r.isTimedOutByNHC(remediation) {
 		log.Info("NHC time out annotation found, stopping remediation")
+		commonevents.RemediationStoppedByNHC(r.Recorder, remediation)
 		_, err = r.updateConditions(remediationTimedOutByNhc, remediation)
 		return ctrl.Result{}, err
 	}
@@ -151,10 +156,13 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 		// situation. An error is returned only if it does not match the following custom errors, or
 		// updateConditions fails.
 		if err == nodeNotFoundError {
+			commonevents.WarningEvent(r.Recorder, remediation, string(remediationSkippedNodeNotFound), nodeNotFoundErrorMsg)
 			_, err = r.updateConditions(remediationSkippedNodeNotFound, remediation)
 		} else if err == machineNotFoundError {
+			commonevents.WarningEvent(r.Recorder, remediation, string(remediationSkippedMachineNotFound), machineNotFoundErrorMsg)
 			_, err = r.updateConditions(remediationSkippedMachineNotFound, remediation)
 		} else if err == unrecoverableError {
+			commonevents.WarningEvent(r.Recorder, remediation, string(remediationFailed), unrecoverableError.Error())
 			_, err = r.updateConditions(remediationFailed, remediation)
 		}
 
@@ -170,13 +178,19 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 	// verify nodes count restoration even if machine == nil.
 	if machine == nil || machine.GetCreationTimestamp().After(remediation.GetCreationTimestamp().Time) {
 		if isRestored, err := r.isExpectedNodesNumberRestored(ctx, remediation); err != nil {
-			log.Error(err, "could not verify if node was restored")
+			msg := "could not verify if node was restored"
+			log.Error(err, msg)
+			commonevents.WarningEvent(r.Recorder, remediation, "unableToVerifyNodesCount", err.Error())
 			if err == unrecoverableError {
 				return ctrl.Result{}, nil
 			}
 			return ctrl.Result{}, err
 		} else if isRestored {
+			commonevents.NormalEvent(r.Recorder, remediation, string(remediationFinishedMachineDeleted), successfulMachineDeletionInfo)
 			_, err = r.updateConditions(remediationFinishedMachineDeleted, remediation)
+			if err == nil {
+				commonevents.RemediationFinished(r.Recorder, remediation)
+			}
 			return ctrl.Result{}, err
 		}
 		log.Info("waiting for the nodes count to be re-provisioned")
@@ -207,6 +221,7 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 
 	if updateRequired := r.setPermanentNodeDeletionExpectedCondition(status, remediation); updateRequired {
 		log.Info(permanentNodeDeletionExpectedMsg)
+		commonevents.NormalEvent(r.Recorder, remediation, "PermanentNodeDeletionExpected", permanentNodeDeletionExpectedMsg)
 		return ctrl.Result{RequeueAfter: time.Second}, nil
 	}
 
@@ -217,7 +232,9 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 	}
 
 	if !hasControllerOwner(machine) {
-		log.Info("ignoring remediation of node-associated machine: the machine has no controller owner", "machine", machine.GetName(), "node name", remediation.Name)
+		msg := "ignoring remediation of node-associated machine: the machine has no controller owner"
+		log.Info(msg, "machine", machine.GetName(), "node name", remediation.Name)
+		commonevents.WarningEvent(r.Recorder, remediation, string(remediationSkippedNoControllerOwner), msg)
 		_, err = r.updateConditions(remediationSkippedNoControllerOwner, remediation)
 		return ctrl.Result{}, err
 	}
@@ -228,6 +245,7 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 		return ctrl.Result{}, errors.Wrapf(err, "failed to save Machine's name and namespace")
 	}
 
+	commonevents.NormalEvent(r.Recorder, remediation, "MachineDeletionRequested", "requesting machine deletion")
 	log.Info("request node-associated machine deletion", "machine", machine.GetName(), "node", nodeName)
 	err = r.Delete(ctx, machine)
 	if err != nil {
@@ -306,6 +324,7 @@ func (r *MachineDeletionRemediationReconciler) getMachine(ctx context.Context, r
 			if apiErrors.IsNotFound(err) {
 				r.Log.Error(err, nodeNotFoundErrorMsg, "node name", remediation.Name)
 				err = nodeNotFoundError
+
 			}
 			return nil, err
 		}

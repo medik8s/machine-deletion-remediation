@@ -138,6 +138,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationSkippedNodeNotFound},
 						{commonconditions.SucceededType, metav1.ConditionFalse, remediationSkippedNodeNotFound}})
 					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
+					verifyEvent("Warning", "RemediationSkippedNodeNotFound", "failed to fetch node")
 				})
 			})
 
@@ -154,6 +155,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 						{commonconditions.SucceededType, metav1.ConditionFalse, remediationSkippedNoControllerOwner},
 						// Cluster provider is not set in this test
 						{commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason}})
+					verifyEvent("Warning", "RemediationSkippedNoControllerOwner", "ignoring remediation of node-associated machine: the machine has no controller owner")
 				})
 			})
 
@@ -172,6 +174,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 						{commonconditions.SucceededType, metav1.ConditionFalse, remediationSkippedNoControllerOwner},
 						// Cluster provider is not set in this test
 						{commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason}})
+					verifyEvent("Warning", "RemediationSkippedNoControllerOwner", "ignoring remediation of node-associated machine: the machine has no controller owner")
 				})
 			})
 
@@ -191,6 +194,8 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 						{commonconditions.SucceededType, metav1.ConditionFalse, remediationSkippedNoControllerOwner},
 						// Cluster provider is not set in this test
 						{commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason}})
+
+					verifyEvent("Warning", "RemediationSkippedNoControllerOwner", "ignoring remediation of node-associated machine: the machine has no controller owner")
 				})
 			})
 
@@ -266,6 +271,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 						{commonconditions.SucceededType, metav1.ConditionTrue, remediationFinishedMachineDeleted},
 						// Cluster provider is not set in this test
 						{commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason}})
+					verifyEvent("Normal", "MachineDeleted", "node-associated machine correctly deleted")
 				})
 			})
 
@@ -277,6 +283,9 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 				})
 				It("sets PermanentNodeDeletionExpected condition to false", func() {
 					verifyConditionMatches(commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionFalse, v1alpha1.MachineDeletionOnBareMetalProviderReason)
+					verifyEvent("Normal",
+						"PermanentNodeDeletionExpected",
+						"Machine will be deleted and the unhealthy node replaced. This is a BareMetal cluster provider: the new node is NOT expected to have a new name")
 				})
 			})
 
@@ -288,6 +297,9 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 				})
 				It("sets PermanentNodeDeletionExpected condition to true", func() {
 					verifyConditionMatches(commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionTrue, v1alpha1.MachineDeletionOnCloudProviderReason)
+					verifyEvent("Normal",
+						"PermanentNodeDeletionExpected",
+						"Machine will be deleted and the unhealthy node replaced. This is a Cloud cluster provider: the new node is expected to have a new name")
 				})
 			})
 
@@ -300,6 +312,9 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 				})
 				It("sets PermanentNodeDeletionExpected condition to false", func() {
 					verifyConditionMatches(commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason)
+					verifyEvent("Normal",
+						"PermanentNodeDeletionExpected",
+						"Machine will be deleted and the unhealthy node replaced. Unknown cluster provider: no information about the new node's name")
 				})
 			})
 		})
@@ -319,6 +334,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationSkippedNodeNotFound},
 						{commonconditions.SucceededType, metav1.ConditionFalse, remediationSkippedNodeNotFound}})
 					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
+					verifyEvent("Warning", "RemediationSkippedNodeNotFound", "failed to fetch node")
 				})
 			})
 
@@ -338,6 +354,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationFailed},
 						{commonconditions.SucceededType, metav1.ConditionFalse, remediationFailed}})
 					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
+					verifyEvent("Warning", "RemediationFailed", "unrecoverable error")
 				})
 			})
 
@@ -357,6 +374,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationFailed},
 						{commonconditions.SucceededType, metav1.ConditionFalse, remediationFailed}})
 					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
+					verifyEvent("Warning", "RemediationFailed", "unrecoverable error")
 				})
 			})
 
@@ -376,6 +394,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationFailed},
 						{commonconditions.SucceededType, metav1.ConditionFalse, remediationFailed}})
 					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
+					verifyEvent("Warning", "RemediationFailed", "unrecoverable error")
 				})
 			})
 
@@ -395,6 +414,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationSkippedMachineNotFound},
 						{commonconditions.SucceededType, metav1.ConditionFalse, remediationSkippedMachineNotFound}})
 					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
+					verifyEvent("Warning", "RemediationSkippedMachineNotFound", "failed to fetch machine of node")
 				})
 			})
 
@@ -415,6 +435,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					// beginning. As a result, the first attempt to get the Machine is via CR's annotation, it fails,
 					// and the condition cannot be set. Normally, the first attempt is via Node's annotation instead.
 					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
+					verifyEvent("Warning", "RemediationFailed", "unrecoverable error")
 				})
 			})
 
@@ -453,6 +474,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					// beginning. As a result, the first attempt to get the Machine is via CR's annotation, it fails,
 					// and the condition cannot be set. Normally, the first attempt is via Node's annotation instead.
 					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
+					verifyEvent("Normal", "RemediationStopped", "NHC added the timed-out annotation, remediation will be stopped")
 				})
 			})
 		})
@@ -575,13 +597,13 @@ func verifyMachineNotDeleted(machineName string) {
 	Consistently(
 		func() error {
 			return k8sClient.Get(context.Background(), client.ObjectKey{Namespace: defaultNamespace, Name: machineName}, createDummyMachine())
-		}).ShouldNot(HaveOccurred())
+		}).ShouldNot(HaveOccurred(), "Machine %s should not have been deleted", machineName)
 }
 
 func verifyMachineIsDeleted(machineName string) {
 	Eventually(func() bool {
 		return errors.IsNotFound(k8sClient.Get(context.Background(), client.ObjectKey{Namespace: defaultNamespace, Name: machineName}, createDummyMachine()))
-	}).Should(BeTrue())
+	}).Should(BeTrue(), "Machine %s should have been deleted", machineName)
 }
 
 func deleteIgnoreNotFound() func(ctx context.Context, obj client.Object) error {
@@ -661,4 +683,24 @@ func setMachineProviderID(machine *machinev1beta1.Machine, providerID string) {
 
 	machine.Spec.ProviderID = &providerID
 	Expect(k8sClient.Update(context.TODO(), machine)).To(Succeed())
+}
+
+func verifyEvent(eventType, reason, message string) {
+	expected := fmt.Sprintf("%s %s [remediation] %s", eventType, reason, message)
+	match := false
+
+	By(fmt.Sprintf("verifying that the event was: %s", expected))
+	allEventsString := ""
+	for {
+		select {
+		case got := <-fakeRecorder.Events:
+			allEventsString += fmt.Sprintf("\t%s\n", got)
+			match = match || got == expected
+			continue
+		case <-time.After(1 * time.Second):
+		}
+		break
+
+	}
+	Expect(match).To(BeTrue(), "event not found.\nExpected: %s\nGot:\n%v", expected, allEventsString)
 }

@@ -11,7 +11,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	go.uber.org/zap v1.25.0
 	k8s.io/api v0.28.1
-	k8s.io/apimachinery v0.28.1
+	k8s.io/apimachinery v0.29.0-alpha.0.0.20231012225557-ab8b4c890065
 	k8s.io/client-go v0.28.1
 	sigs.k8s.io/controller-runtime v0.16.1
 	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20230707165103-87487d3539d7

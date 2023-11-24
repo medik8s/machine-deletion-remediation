@@ -112,15 +112,15 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 	log.Info("reconciling...")
 
 	var err error
-	var remediation *v1alpha1.MachineDeletionRemediation
-	if remediation, err = r.getRemediation(ctx, req); remediation == nil || err != nil {
+	var mdr *v1alpha1.MachineDeletionRemediation
+	if mdr, err = r.getRemediation(ctx, req); mdr == nil || err != nil {
 		return ctrl.Result{}, err
 	}
 
-	log.Info("Machine Deletion Remediation CR found", "name", remediation.GetName())
+	log.Info("Machine Deletion Remediation CR found", "name", mdr.GetName())
 
 	defer func() {
-		if updateErr := r.updateStatus(ctx, remediation); updateErr != nil {
+		if updateErr := r.updateStatus(ctx, mdr); updateErr != nil {
 			if !apiErrors.IsConflict(updateErr) {
 				finalErr = utilerrors.NewAggregate([]error{updateErr, finalErr})
 			}
@@ -129,33 +129,33 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 	}()
 
 	// Remediation's name was created from Node's name
-	nodeName := remediation.GetName()
+	nodeName := mdr.GetName()
 
-	if r.isTimedOutByNHC(remediation) {
+	if r.isTimedOutByNHC(mdr) {
 		log.Info("NHC time out annotation found, stopping remediation")
-		_, err = r.updateConditions(remediationTimedOutByNhc, remediation)
+		_, err = r.updateConditions(remediationTimedOutByNhc, mdr)
 		return ctrl.Result{}, err
 	}
 
-	if updateRequired, err := r.updateConditions(remediationStarted, remediation); err != nil {
+	if updateRequired, err := r.updateConditions(remediationStarted, mdr); err != nil {
 		log.Error(err, "could not update Status conditions")
 		return ctrl.Result{}, err
 	} else if updateRequired {
 		return ctrl.Result{RequeueAfter: time.Second}, nil
 	}
 
-	machine, err := r.getMachine(ctx, remediation)
+	machine, err := r.getMachine(ctx, mdr)
 	if err != nil {
 		// Handling specific error scenarios. We avoid re-queue by returning nil after updating the
 		// conditions, as these are unrecoverable errors and re-queue would not change the
 		// situation. An error is returned only if it does not match the following custom errors, or
 		// updateConditions fails.
 		if err == nodeNotFoundError {
-			_, err = r.updateConditions(remediationSkippedNodeNotFound, remediation)
+			_, err = r.updateConditions(remediationSkippedNodeNotFound, mdr)
 		} else if err == machineNotFoundError {
-			_, err = r.updateConditions(remediationSkippedMachineNotFound, remediation)
+			_, err = r.updateConditions(remediationSkippedMachineNotFound, mdr)
 		} else if err == unrecoverableError {
-			_, err = r.updateConditions(remediationFailed, remediation)
+			_, err = r.updateConditions(remediationFailed, mdr)
 		}
 
 		return ctrl.Result{}, err
@@ -168,22 +168,22 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 	// If the latter, wait for the expected number of nodes to be restored before setting the Succeeded condition.
 	// NOTE: the Machine will always be nil after deletion if it changes name after re-provisioning, this is why we
 	// verify nodes count restoration even if machine == nil.
-	if machine == nil || machine.GetCreationTimestamp().After(remediation.GetCreationTimestamp().Time) {
-		if isRestored, err := r.isExpectedNodesNumberRestored(ctx, remediation); err != nil {
+	if machine == nil || machine.GetCreationTimestamp().After(mdr.GetCreationTimestamp().Time) {
+		if isRestored, err := r.isExpectedNodesNumberRestored(ctx, mdr); err != nil {
 			log.Error(err, "could not verify if node was restored")
 			if err == unrecoverableError {
 				return ctrl.Result{}, nil
 			}
 			return ctrl.Result{}, err
 		} else if isRestored {
-			_, err = r.updateConditions(remediationFinishedMachineDeleted, remediation)
+			_, err = r.updateConditions(remediationFinishedMachineDeleted, mdr)
 			return ctrl.Result{}, err
 		}
 		log.Info("waiting for the nodes count to be re-provisioned")
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
-	log.Info("node-associated machine found", "node", remediation.Name, "machine", machine.GetName())
+	log.Info("node-associated machine found", "node", mdr.Name, "machine", machine.GetName())
 
 	// Detect if Node name is expected to change after Machine deletion given
 	// the Platform type. In case of BareMetal platform, the name is NOT
@@ -205,7 +205,7 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 		status = metav1.ConditionTrue
 	}
 
-	if updateRequired := r.setPermanentNodeDeletionExpectedCondition(status, remediation); updateRequired {
+	if updateRequired := r.setPermanentNodeDeletionExpectedCondition(status, mdr); updateRequired {
 		log.Info(permanentNodeDeletionExpectedMsg)
 		return ctrl.Result{RequeueAfter: time.Second}, nil
 	}
@@ -217,13 +217,13 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 	}
 
 	if !hasControllerOwner(machine) {
-		log.Info("ignoring remediation of node-associated machine: the machine has no controller owner", "machine", machine.GetName(), "node name", remediation.Name)
-		_, err = r.updateConditions(remediationSkippedNoControllerOwner, remediation)
+		log.Info("ignoring remediation of node-associated machine: the machine has no controller owner", "machine", machine.GetName(), "node name", mdr.Name)
+		_, err = r.updateConditions(remediationSkippedNoControllerOwner, mdr)
 		return ctrl.Result{}, err
 	}
 
 	// save Machine's name and namespace to follow its deletion phase
-	if err = r.saveMachineData(ctx, remediation, machine); err != nil {
+	if err = r.saveMachineData(ctx, mdr, machine); err != nil {
 		log.Error(err, "could not save Machine's Name and Namespace", "machine name", machine.GetName(), "machine namespace", machine.GetNamespace())
 		return ctrl.Result{}, errors.Wrapf(err, "failed to save Machine's name and namespace")
 	}

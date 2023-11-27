@@ -10,6 +10,7 @@ metadata:
     description: Machine Deletion Remediation operator for reprovisioning unhealthy
       nodes using the Machine API.
     olm.skipRange: '>=0.0.1'
+    operatorframework.io/suggested-namespace: openshift-workload-availability
     repository: https://github.com/medik8s/machine-deletion-remediation
     support: Medik8s
   name: machine-deletion-remediation.v0.0.0

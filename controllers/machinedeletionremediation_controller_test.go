@@ -14,7 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	machinev1 "github.com/openshift/api/machine/v1"
@@ -506,7 +506,7 @@ func createControlPlaneMachineSet(name string) *machinev1.ControlPlaneMachineSet
 			Namespace: defaultNamespace,
 		},
 		Spec: machinev1.ControlPlaneMachineSetSpec{
-			Replicas: pointer.Int32(3),
+			Replicas: ptr.To[int32](3),
 			Selector: metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"machine.openshift.io/cluster-api-machine-role": "master",

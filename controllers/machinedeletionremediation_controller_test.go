@@ -24,21 +24,23 @@ import (
 )
 
 const (
-	defaultNamespace                                                          = "default"
-	machineSetName                                                            = "machine-set-x"
-	machineSetKind                                                            = "MachineSet"
-	cpmsName                                                                  = "cpms-x"
-	cpmsKind                                                                  = "ControlPlaneMachineSet"
-	dummyMachine                                                              = "dummy-machine"
-	workerNodeName, masterNodeName, cpNodeWithOwnerName, noneExistingNodeName = "worker-node-x", "master-node-x", "cp-node-x", "phantom-node"
-	workerNodeMachineName, masterNodeMachineName, cpNodeMachineName           = "worker-node-x-machine", "master-node-x-machine", "control-plane-node-x-machine"
-	mockDeleteFailMessage                                                     = "mock delete failure"
-	noMachineDeletionRemediationCRFound                                       = "noMachineDeletionRemediationCRFound"
-	processingConditionNotSetError                                            = "ProcessingConditionNotSet"
-	processingConditionSetButNoMatchError                                     = "ProcessingConditionSetButNoMatch"
-	processingConditionSetAndMatchSuccess                                     = "ProcessingConditionSetAndMatch"
-	processingConditionSetButWrongReasonError                                 = "processingConditionSetButWrongReason"
-	processingConditionStartedInfo                                            = "{\"processingConditionStatus\": \"True\", \"succededConditionStatus\": \"Unknown\", \"reason\": \"RemediationStarted\"}"
+	defaultNamespace                                                     = "default"
+	machineNamespace                                                     = "openshift-machine-api"
+	machineSetName, machineSetNameZeroReplicas                           = "machine-set-x", "machine-set-x-zero-replicas"
+	machineSetKind                                                       = "MachineSet"
+	cpmsName                                                             = "cpms-x"
+	cpmsKind                                                             = "ControlPlaneMachineSet"
+	dummyMachine                                                         = "dummy-machine"
+	workerNodeName, masterNodeName, cpNodeWithOwnerName, phantomNodeName = "worker-node-x", "master-node-x", "cp-node-x", "phantom-node"
+	workerNodeMachineName, masterNodeMachineName, cpNodeMachineName      = "worker-node-x-machine", "master-node-x-machine", "control-plane-node-x-machine"
+	phantomNodeMachineName                                               = "phantom-node-machine"
+	mockDeleteFailMessage                                                = "mock delete failure"
+	noMachineDeletionRemediationCRFound                                  = "noMachineDeletionRemediationCRFound"
+	processingConditionNotSetError                                       = "ProcessingConditionNotSet"
+	processingConditionSetButNoMatchError                                = "ProcessingConditionSetButNoMatch"
+	processingConditionSetAndMatchSuccess                                = "ProcessingConditionSetAndMatch"
+	processingConditionSetButWrongReasonError                            = "processingConditionSetButWrongReason"
+	processingConditionStartedInfo                                       = "{\"processingConditionStatus\": \"True\", \"succededConditionStatus\": \"Unknown\", \"reason\": \"RemediationStarted\"}"
 )
 
 var underTest *v1alpha1.MachineDeletionRemediation
@@ -51,11 +53,11 @@ type expectedCondition struct {
 
 var _ = Describe("Machine Deletion Remediation CR", func() {
 	var (
-		machineSet                                          *machinev1beta1.MachineSet
-		cpms                                                *machinev1.ControlPlaneMachineSet
-		workerNodeMachine, masterNodeMachine, cpNodeMachine *machinev1beta1.Machine
-		workerNode, masterNode                              *v1.Node
-		cpNodeWithOwnerList                                 []v1.Node
+		machineSet, machineSetZeroReplicas                                      *machinev1beta1.MachineSet
+		cpms                                                                    *machinev1.ControlPlaneMachineSet
+		workerNodeMachine, masterNodeMachine, cpNodeMachine, phantomNodeMachine *machinev1beta1.Machine
+		workerNode, masterNode                                                  *v1.Node
+		cpNodeWithOwnerList                                                     []v1.Node
 		//phantomNode is never created by client
 		phantomNode *v1.Node
 	)
@@ -80,17 +82,19 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 		BeforeEach(func() {
 			plogs.Clear()
 
-			machineSet = createMachineSet(machineSetName)
+			machineSet = createMachineSet(machineSetName, 1)
+			machineSetZeroReplicas = createMachineSet(machineSetNameZeroReplicas, 0)
 			cpms = createControlPlaneMachineSet(cpmsName)
 
 			workerNodeMachine = createMachineWithOwner(workerNodeMachineName, machineSet)
+			phantomNodeMachine = createMachineWithOwner(phantomNodeMachineName, machineSetZeroReplicas)
 			masterNodeMachine = createMachine(masterNodeMachineName)
 			cpNodeMachine = createMachineWithOwner(cpNodeMachineName, cpms)
 
 			workerNode, masterNode, phantomNode =
 				createNodeWithMachine(workerNodeName, workerNodeMachine),
 				createNodeWithMachine(masterNodeName, masterNodeMachine),
-				createNode(noneExistingNodeName)
+				createNode(phantomNodeName)
 
 			// CPMS's ReplicaSet has minimum value of 3, so we need 3 CP nodes
 			for i := 0; i < 3; i++ {
@@ -101,23 +105,27 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 			}
 
 			Expect(k8sClient.Create(context.Background(), machineSet)).To(Succeed())
+			Expect(k8sClient.Create(context.Background(), machineSetZeroReplicas)).To(Succeed())
 			Expect(k8sClient.Create(context.Background(), cpms)).To(Succeed())
 			Expect(k8sClient.Create(context.Background(), masterNode)).To(Succeed())
 			Expect(k8sClient.Create(context.Background(), workerNode)).To(Succeed())
 			Expect(k8sClient.Create(context.Background(), masterNodeMachine)).To(Succeed())
 			Expect(k8sClient.Create(context.Background(), cpNodeMachine)).To(Succeed())
 			Expect(k8sClient.Create(context.Background(), workerNodeMachine)).To(Succeed())
+			Expect(k8sClient.Create(context.Background(), phantomNodeMachine)).To(Succeed())
 
 			DeferCleanup(k8sClient.Delete, machineSet)
+			DeferCleanup(k8sClient.Delete, machineSetZeroReplicas)
 			DeferCleanup(k8sClient.Delete, cpms)
 			DeferCleanup(k8sClient.Delete, masterNode)
 			DeferCleanup(k8sClient.Delete, workerNode)
 			DeferCleanup(k8sClient.Delete, masterNodeMachine)
 
-			// cpNodeMachine and workerNodeMachine are expected to be deleted in some tests
+			// The following Machines are expected to be deleted in some tests
 			// so do not error if they are not found
 			DeferCleanup(deleteIgnoreNotFound(), cpNodeMachine)
 			DeferCleanup(deleteIgnoreNotFound(), workerNodeMachine)
+			DeferCleanup(deleteIgnoreNotFound(), phantomNodeMachine)
 		})
 
 		JustBeforeEach(func() {
@@ -128,7 +136,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 		Context("Sunny Flows", func() {
 			When("node does not exist", func() {
 				BeforeEach(func() {
-					underTest = createRemediationOwnedByNHC(phantomNode)
+					underTest = createRemediationOwnedByNHC(phantomNode.Name)
 				})
 
 				It("No machine is deleted", func() {
@@ -143,7 +151,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 			When("remediation associated machine has no owner ref", func() {
 				BeforeEach(func() {
-					underTest = createRemediationOwnedByNHC(masterNode)
+					underTest = createRemediationOwnedByNHC(masterNode.Name)
 				})
 
 				It("No machine is deleted", func() {
@@ -161,7 +169,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 				BeforeEach(func() {
 					workerNodeMachine.OwnerReferences[0].Controller = nil
 					Expect(k8sClient.Update(context.Background(), workerNodeMachine)).ToNot(HaveOccurred())
-					underTest = createRemediationOwnedByNHC(workerNode)
+					underTest = createRemediationOwnedByNHC(workerNode.Name)
 				})
 
 				It("No machine is deleted", func() {
@@ -180,7 +188,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					controllerValue := false
 					workerNodeMachine.OwnerReferences[0].Controller = &controllerValue
 					Expect(k8sClient.Update(context.Background(), workerNodeMachine)).ToNot(HaveOccurred())
-					underTest = createRemediationOwnedByNHC(workerNode)
+					underTest = createRemediationOwnedByNHC(workerNode.Name)
 				})
 
 				It("No machine is deleted", func() {
@@ -196,7 +204,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 			When("remediation associated machine has valid owner ref of CPMS Kind", func() {
 				BeforeEach(func() {
-					underTest = createRemediationOwnedByNHC(&cpNodeWithOwnerList[0])
+					underTest = createRemediationOwnedByNHC(cpNodeWithOwnerList[0].Name)
 				})
 
 				It("CP machine is deleted", func() {
@@ -221,7 +229,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 					for i := 0; i < 3; i++ {
 						cpNode := cpNodeWithOwnerList[i]
-						cpNode.Annotations[machineAnnotationOpenshift] = fmt.Sprintf("%s/%s", defaultNamespace, replacementName)
+						cpNode.Annotations[machineAnnotationOpenshift] = fmt.Sprintf("%s/%s", machineNamespace, replacementName)
 						Expect(k8sClient.Update(context.Background(), &cpNode)).To(Succeed())
 					}
 
@@ -236,7 +244,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 			When("worker node remediation exists", func() {
 				BeforeEach(func() {
-					underTest = createRemediationOwnedByNHC(workerNode)
+					underTest = createRemediationOwnedByNHC(workerNode.Name)
 				})
 				It("worker machine is deleted", func() {
 					verifyMachineIsDeleted(workerNodeMachineName)
@@ -257,7 +265,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					Expect(k8sClient.Create(context.Background(), workerNodeMachineReplacement)).To(Succeed())
 					DeferCleanup(k8sClient.Delete, workerNodeMachineReplacement)
 
-					workerNode.Annotations[machineAnnotationOpenshift] = fmt.Sprintf("%s/%s", defaultNamespace, machineReplacementName)
+					workerNode.Annotations[machineAnnotationOpenshift] = fmt.Sprintf("%s/%s", machineNamespace, machineReplacementName)
 					Expect(k8sClient.Update(context.Background(), workerNode)).To(Succeed())
 
 					// Now the remediation should be completed
@@ -272,7 +280,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 			When("creating a resource in baremetal provider", func() {
 				BeforeEach(func() {
 					setMachineProviderID(workerNodeMachine, "baremetal:///dummy-provider-ID")
-					underTest = createRemediationOwnedByNHC(workerNode)
+					underTest = createRemediationOwnedByNHC(workerNode.Name)
 
 				})
 				It("sets PermanentNodeDeletionExpected condition to false", func() {
@@ -283,7 +291,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 			When("creating a resource in cloud provider", func() {
 				BeforeEach(func() {
 					setMachineProviderID(workerNodeMachine, "cloud:///dummy-provider-ID")
-					underTest = createRemediationOwnedByNHC(workerNode)
+					underTest = createRemediationOwnedByNHC(workerNode.Name)
 
 				})
 				It("sets PermanentNodeDeletionExpected condition to true", func() {
@@ -295,7 +303,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 			When("creating a resource in an unknown provider", func() {
 				BeforeEach(func() {
 					// do not set the providerID in Machine
-					underTest = createRemediationOwnedByNHC(workerNode)
+					underTest = createRemediationOwnedByNHC(workerNode.Name)
 
 				})
 				It("sets PermanentNodeDeletionExpected condition to false", func() {
@@ -307,7 +315,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 		Context("Rainy (Error) Flows", func() {
 			When("remediation is not connected to a node", func() {
 				BeforeEach(func() {
-					underTest = createRemediationOwnedByNHC(phantomNode)
+					underTest = createRemediationOwnedByNHC(phantomNode.Name)
 				})
 
 				It("node not found error", func() {
@@ -324,7 +332,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 			When("node does not have annotations", func() {
 				BeforeEach(func() {
-					underTest = createRemediationOwnedByNHC(masterNode)
+					underTest = createRemediationOwnedByNHC(masterNode.Name)
 					masterNode.Annotations = nil
 					Expect(k8sClient.Update(context.Background(), masterNode)).ToNot(HaveOccurred())
 				})
@@ -343,7 +351,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 			When("node does not have machine annotation", func() {
 				BeforeEach(func() {
-					underTest = createRemediationOwnedByNHC(masterNode)
+					underTest = createRemediationOwnedByNHC(masterNode.Name)
 					masterNode.Annotations[machineAnnotationOpenshift] = ""
 					Expect(k8sClient.Update(context.Background(), masterNode)).ToNot(HaveOccurred())
 				})
@@ -362,7 +370,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 			When("node's machine annotation has invalid value", func() {
 				BeforeEach(func() {
-					underTest = createRemediationOwnedByNHC(masterNode)
+					underTest = createRemediationOwnedByNHC(masterNode.Name)
 					masterNode.Annotations[machineAnnotationOpenshift] = "Gibberish"
 					Expect(k8sClient.Update(context.Background(), masterNode)).ToNot(HaveOccurred())
 				})
@@ -381,7 +389,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 			When("machine pointed to by node's annotation does not exist", func() {
 				BeforeEach(func() {
-					underTest = createRemediationOwnedByNHC(masterNode)
+					underTest = createRemediationOwnedByNHC(masterNode.Name)
 					masterNode.Annotations[machineAnnotationOpenshift] = "phantom-machine-namespace/phantom-machine-name"
 					Expect(k8sClient.Update(context.Background(), masterNode)).ToNot(HaveOccurred())
 				})
@@ -400,7 +408,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 			When("Remediation has incorrect annotation", func() {
 				BeforeEach(func() {
-					underTest = createRemediationOwnedByNHCWithAnnotation(masterNode, MachineNameNsAnnotation, "Gibberish")
+					underTest = createRemediationOwnedByNHCWithAnnotation(masterNode.Name, MachineNameNsAnnotation, "Gibberish")
 				})
 
 				It("fails to follow machine deletion", func() {
@@ -424,7 +432,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					DeferCleanup(func() {
 						cclient.onDeleteError = nil
 					})
-					underTest = createRemediationOwnedByNHC(workerNode)
+					underTest = createRemediationOwnedByNHC(workerNode.Name)
 				})
 
 				It("returns the same delete failure error", func() {
@@ -442,7 +450,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 			When("NHC stops the remediation", func() {
 				BeforeEach(func() {
-					underTest = createRemediationOwnedByNHCWithAnnotation(workerNode, commonannotations.NhcTimedOut, "some timestamp")
+					underTest = createRemediationOwnedByNHCWithAnnotation(workerNode.Name, commonannotations.NhcTimedOut, "some timestamp")
 				})
 
 				It("returns without completing remediation", func() {
@@ -456,16 +464,80 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 				})
 			})
 		})
+
+		Context("Support to MHC created CR", func() {
+			When("Machine's node exists", func() {
+				BeforeEach(func() {
+					// The actual remediation name should be the same as the Machine's name, however
+					// the test use a different name to make sure the target Machine is not found looking at the
+					// remediation's name.
+					underTest = createRemediationOwnedByMHC("remediation-name", workerNodeMachine)
+				})
+
+				It("MHC worker machine is deleted", func() {
+					verifyMachineIsDeleted(workerNodeMachineName)
+					verifyMachineNotDeleted(masterNodeMachineName)
+
+					// Machine is deleted, but the remediation is not completed yet
+					verifyConditionsMatch([]expectedCondition{
+						{commonconditions.ProcessingType, metav1.ConditionTrue, remediationStarted},
+						{commonconditions.SucceededType, metav1.ConditionUnknown, remediationStarted},
+						// Cluster provider is not set in this test
+						{commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason}})
+
+					// Mock Machine and Node re-provisioning (even though this test does not actually delete the node, just the machine).
+					// 1. Create a Machine's replacement with a new name
+					// 2. Update WorkerNode's annotation to point to the new Machine
+					machineReplacementName := workerNodeMachineName + "-replacement"
+					workerNodeMachineReplacement := createMachineWithOwner(machineReplacementName, machineSet)
+					Expect(k8sClient.Create(context.Background(), workerNodeMachineReplacement)).To(Succeed())
+					DeferCleanup(k8sClient.Delete, workerNodeMachineReplacement)
+
+					workerNode.Annotations[machineAnnotationOpenshift] = fmt.Sprintf("%s/%s", machineNamespace, machineReplacementName)
+					Expect(k8sClient.Update(context.Background(), workerNode)).To(Succeed())
+
+					// Now the remediation should be completed
+					verifyConditionsMatch([]expectedCondition{
+						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationFinishedMachineDeleted},
+						{commonconditions.SucceededType, metav1.ConditionTrue, remediationFinishedMachineDeleted},
+						// Cluster provider is not set in this test
+						{commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason}})
+				})
+			})
+
+			When("Machine's node does not exist", func() {
+				BeforeEach(func() {
+					// The actual remediation name should be the same as the Machine's name, however
+					// the test use a different name to make sure the target Machine is not found looking at the
+					// remediation's name.
+					underTest = createRemediationOwnedByMHC("remediation-name", phantomNodeMachine)
+				})
+
+				It("MHC worker machine is deleted", func() {
+					verifyMachineIsDeleted(phantomNodeMachineName)
+					verifyMachineNotDeleted(workerNodeMachineName)
+					verifyMachineNotDeleted(masterNodeMachineName)
+
+					// Machine is deleted and MDR does not have to wait for the node count restoration, so the
+					// remediation should be completed already.
+					verifyConditionsMatch([]expectedCondition{
+						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationFinishedMachineDeleted},
+						{commonconditions.SucceededType, metav1.ConditionTrue, remediationFinishedMachineDeleted},
+						// Cluster provider is not set in this test
+						{commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason}})
+				})
+			})
+		})
 	})
 })
 
-func createRemediationOwnedByNHC(node *v1.Node) *v1alpha1.MachineDeletionRemediation {
+func createRemediationOwnedByNHC(remediationName string) *v1alpha1.MachineDeletionRemediation {
 	mdr := &v1alpha1.MachineDeletionRemediation{}
-	mdr.Name = node.Name
+	mdr.Name = remediationName
 	mdr.Namespace = defaultNamespace
 	mdr.SetOwnerReferences([]metav1.OwnerReference{
 		{
-			Name:       node.Name,
+			Name:       remediationName,
 			Kind:       "NodeHealthCheck",
 			UID:        "1234",
 			APIVersion: "remediation.medik8s.io/v1alpha1",
@@ -474,10 +546,10 @@ func createRemediationOwnedByNHC(node *v1.Node) *v1alpha1.MachineDeletionRemedia
 	return mdr
 }
 
-func createRemediationOwnedByMHC(node *v1.Node, owner *machinev1beta1.Machine) *v1alpha1.MachineDeletionRemediation {
+func createRemediationOwnedByMHC(remediationName string, owner *machinev1beta1.Machine) *v1alpha1.MachineDeletionRemediation {
 	mdr := &v1alpha1.MachineDeletionRemediation{}
-	mdr.Name = node.Name
-	mdr.Namespace = defaultNamespace
+	mdr.Name = remediationName
+	mdr.Namespace = machineNamespace
 	mdr.SetOwnerReferences([]metav1.OwnerReference{
 		{
 			Name:       owner.Name,
@@ -489,8 +561,8 @@ func createRemediationOwnedByMHC(node *v1.Node, owner *machinev1beta1.Machine) *
 	return mdr
 }
 
-func createRemediationOwnedByNHCWithAnnotation(node *v1.Node, key, annotation string) *v1alpha1.MachineDeletionRemediation {
-	mdr := createRemediationOwnedByNHC(node)
+func createRemediationOwnedByNHCWithAnnotation(remediationName string, key, annotation string) *v1alpha1.MachineDeletionRemediation {
+	mdr := createRemediationOwnedByNHC(remediationName)
 	annotations := make(map[string]string, 1)
 	annotations[key] = fmt.Sprintf("%s", annotation)
 	mdr.SetAnnotations(annotations)
@@ -511,12 +583,11 @@ func createNode(nodeName string) *v1.Node {
 }
 
 // createMachineSet creates a MachineSet with the given name.
-func createMachineSet(machineSetName string) *machinev1beta1.MachineSet {
+func createMachineSet(machineSetName string, replicas int32) *machinev1beta1.MachineSet {
 	machineSet := &machinev1beta1.MachineSet{}
-	machineSet.SetNamespace(defaultNamespace)
+	machineSet.SetNamespace(machineNamespace)
 	machineSet.SetName(machineSetName)
-	replicas := int32(1)
-	machineSet.Spec.Replicas = &replicas
+	machineSet.Spec.Replicas = ptr.To[int32](replicas)
 	return machineSet
 }
 
@@ -526,7 +597,7 @@ func createControlPlaneMachineSet(name string) *machinev1.ControlPlaneMachineSet
 	cpms := &machinev1.ControlPlaneMachineSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: defaultNamespace,
+			Namespace: machineNamespace,
 		},
 		Spec: machinev1.ControlPlaneMachineSetSpec{
 			Replicas: ptr.To[int32](3),
@@ -557,7 +628,7 @@ func createControlPlaneMachineSet(name string) *machinev1.ControlPlaneMachineSet
 
 func createMachine(machineName string) *machinev1beta1.Machine {
 	machine := &machinev1beta1.Machine{}
-	machine.SetNamespace(defaultNamespace)
+	machine.SetNamespace(machineNamespace)
 	machine.SetName(machineName)
 	return machine
 }
@@ -597,13 +668,13 @@ func createDummyMachine() *machinev1beta1.Machine {
 func verifyMachineNotDeleted(machineName string) {
 	Consistently(
 		func() error {
-			return k8sClient.Get(context.Background(), client.ObjectKey{Namespace: defaultNamespace, Name: machineName}, createDummyMachine())
+			return k8sClient.Get(context.Background(), client.ObjectKey{Namespace: machineNamespace, Name: machineName}, createDummyMachine())
 		}).ShouldNot(HaveOccurred())
 }
 
 func verifyMachineIsDeleted(machineName string) {
 	Eventually(func() bool {
-		return errors.IsNotFound(k8sClient.Get(context.Background(), client.ObjectKey{Namespace: defaultNamespace, Name: machineName}, createDummyMachine()))
+		return errors.IsNotFound(k8sClient.Get(context.Background(), client.ObjectKey{Namespace: machineNamespace, Name: machineName}, createDummyMachine()))
 	}).Should(BeTrue())
 }
 

@@ -59,10 +59,12 @@ const (
 	failedToDeleteMachineError         = "failed to delete machine of node name: %s"
 	nodeNotFoundErrorMsg               = "failed to fetch node"
 	machineNotFoundErrorMsg            = "failed to fetch machine of node"
-
+	// Cluster Provider messages
 	machineDeletedOnCloudProviderMessage     = "Machine will be deleted and the unhealthy node replaced. This is a Cloud cluster provider: the new node is expected to have a new name"
 	machineDeletedOnBareMetalProviderMessage = "Machine will be deleted and the unhealthy node replaced. This is a BareMetal cluster provider: the new node is NOT expected to have a new name"
 	machineDeletedOnUnknownProviderMessage   = "Machine will be deleted and the unhealthy node replaced. Unknown cluster provider: no information about the new node's name"
+	// Machine Kind
+	machineKind = "Machine"
 )
 
 type conditionChangeReason string
@@ -128,9 +130,6 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 		}
 	}()
 
-	// Remediation's name was created from Node's name
-	nodeName := mdr.GetName()
-
 	if r.isTimedOutByNHC(mdr) {
 		log.Info("NHC time out annotation found, stopping remediation")
 		_, err = r.updateConditions(remediationTimedOutByNhc, mdr)
@@ -183,7 +182,7 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
-	log.Info("node-associated machine found", "node", mdr.Name, "machine", machine.GetName())
+	log.Info("target machine found", "machine", machine.GetName())
 
 	// Detect if Node name is expected to change after Machine deletion given
 	// the Platform type. In case of BareMetal platform, the name is NOT
@@ -212,12 +211,12 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 
 	if !machine.GetDeletionTimestamp().IsZero() {
 		// Machine deletion requested already. Log deletion progress until the Machine exists
-		log.Info(postponedMachineDeletionInfo, "node", nodeName, "machine", machine.Name, "machine status.phase", machine.Status.Phase)
+		log.Info(postponedMachineDeletionInfo, "machine", machine.Name, "machine status.phase", machine.Status.Phase)
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
 	if !hasControllerOwner(machine) {
-		log.Info("ignoring remediation of node-associated machine: the machine has no controller owner", "machine", machine.GetName(), "node name", mdr.Name)
+		log.Info("ignoring remediation of the machine: the machine has no controller owner", "machine", machine.GetName())
 		_, err = r.updateConditions(remediationSkippedNoControllerOwner, mdr)
 		return ctrl.Result{}, err
 	}
@@ -228,10 +227,10 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 		return ctrl.Result{}, errors.Wrapf(err, "failed to save Machine's name and namespace")
 	}
 
-	log.Info("request node-associated machine deletion", "machine", machine.GetName(), "node", nodeName)
+	log.Info("request machine deletion", "machine", machine.GetName())
 	err = r.Delete(ctx, machine)
 	if err != nil {
-		log.Error(err, "failed to delete machine associated to node", "machine", machine.GetName(), "node", nodeName)
+		log.Error(err, "failed to delete machine", "machine", machine.GetName())
 		return ctrl.Result{}, err
 	}
 
@@ -270,7 +269,7 @@ func (r *MachineDeletionRemediationReconciler) getRemediation(ctx context.Contex
 	return remediation, nil
 }
 
-func (r *MachineDeletionRemediationReconciler) getNodeFromMdr(ctx context.Context, mdr *v1alpha1.MachineDeletionRemediation) (*v1.Node, error) {
+func (r *MachineDeletionRemediationReconciler) getNodeFromCR(ctx context.Context, mdr *v1alpha1.MachineDeletionRemediation) (*v1.Node, error) {
 	node := &v1.Node{}
 	key := client.ObjectKey{
 		Name: mdr.Name,
@@ -282,36 +281,42 @@ func (r *MachineDeletionRemediationReconciler) getNodeFromMdr(ctx context.Contex
 	return node, nil
 }
 
-// getMachine retrieves a machine from the cluster based on the remediation.
-// It returns the machine, a boolean indicating whether the machine was expected to be found,
-// and an error if any occurred during the retrieval process.
+// getMachine retrieves a Machine from the cluster based on the remediation.
+// It returns the machine and an error if any occurred during the retrieval process.
 func (r *MachineDeletionRemediationReconciler) getMachine(ctx context.Context, remediation *v1alpha1.MachineDeletionRemediation) (*machinev1beta1.Machine, error) {
-	// If the Machine's Name and Ns come from the related Node, it is expected
-	// to find the Machine in the cluster, while if its Name and Ns come from
-	// CR's annotation, the Machine might have been deleted upon our request.
+	// The Name and Namespace to retrieve the target Machine can come from the following sources:
+	// - the remediation's ownerReference: if the remediation was created by MachineHealthcheck
+	// - the remediation's Node: if the remediation was created by NodeHealthcheck or manually
+	// - the remediation's MachineNameNsAnnotation annotation: once the Machine is found and its Name and Namespace are saved in
+
+	// Try to get first the Machine's data from the remediation's annotation, if any. It means that the Machine was already
+	// been found in a previous cycle and we can use the data to verify if the Machine was deleted upon our request or not
 	machineName, machineNs, err := getRemediationDataFromAnnotation(remediation, MachineNameNsAnnotation)
 	if err != nil {
 		r.Log.Error(err, "could not get Machine data from remediation", "remediation", remediation.GetName(), "annotation", MachineNameNsAnnotation)
 		return nil, unrecoverableError
 	}
 
-	var mustExist bool
-	if machineName == "" {
-		// Remediation does not have the MachineDataAnnotation yet. We will try to get the Machine's data from its Node,
-		// and we expect to find the Node and the Machine in the cluster.
-		mustExist = true
+	// If the Machine's Name is not in the annotation, it means that it must come from the other two sources and in
+	// turns it means that the Machine must exist in the cluster, otherwise an error is returned.
+	mustExist := machineName == ""
 
-		node, err := r.getNodeFromMdr(ctx, remediation)
+	if machineName == "" && len(remediation.GetOwnerReferences()) > 0 {
+		machineName, machineNs = r.getMachineNameNsFromOwnerReference(ctx, remediation)
+		if machineName != "" {
+			r.Log.Info("MHC created CR: target machine is CR ownerReference", "machine", machineName, "namespace", machineNs)
+		}
+	}
+
+	if machineName == "" {
+		r.Log.Info("trying to get target Machine from the Node", "node", remediation.Name)
+		machineName, machineNs, err = r.getMachineNameNsFromCR(ctx, remediation)
 		if err != nil {
 			if apiErrors.IsNotFound(err) {
 				r.Log.Error(err, nodeNotFoundErrorMsg, "node name", remediation.Name)
 				err = nodeNotFoundError
 			}
 			return nil, err
-		}
-		if machineName, machineNs, err = getMachineNameNsFromNode(node); err != nil {
-			r.Log.Error(err, "could not get Machine Name NS from Node", "node", node.Name, "annotations", node.GetAnnotations())
-			return nil, unrecoverableError
 		}
 	}
 
@@ -321,6 +326,7 @@ func (r *MachineDeletionRemediationReconciler) getMachine(ctx context.Context, r
 		Namespace: machineNs,
 	}
 
+	r.Log.Info("Looking for the target Machine", "machine", machineName, "namespace", machineNs)
 	if err := r.Get(ctx, key, machine); err != nil {
 		if !apiErrors.IsNotFound(err) {
 			return nil, err
@@ -335,6 +341,7 @@ func (r *MachineDeletionRemediationReconciler) getMachine(ctx context.Context, r
 		r.Log.Info(successfulMachineDeletionInfo, "node", remediation.Name, "machine", machineName)
 		return nil, nil
 	}
+
 	return machine, nil
 }
 
@@ -494,15 +501,20 @@ func (r *MachineDeletionRemediationReconciler) isExpectedNodesNumberRestored(ctx
 		return false, errors.Wrap(unrecoverableError, err.Error())
 	}
 
-	nodes, err := r.getMachineOwnerNodes(ctx, name)
-	if err != nil {
-		r.Log.Error(err, "could not get Machine owner's nodes", "kind", kind, "name", name, "namespace", namespace)
-		return false, err
-	}
-
 	replicas, err := r.getMachineOwnerSpecReplicas(ctx, kind, name, namespace)
 	if err != nil {
 		r.Log.Error(err, "could not get Machine owner's Spec.Replicas", "kind", kind, "name", name, "namespace", namespace)
+		return false, err
+	}
+
+	if replicas == 0 {
+		r.Log.Info("Machine owner's Spec.Replicas is 0, no need to verify Node count restoration")
+		return true, nil
+	}
+
+	nodes, err := r.getMachineOwnerNodes(ctx, name)
+	if err != nil {
+		r.Log.Error(err, "could not get Machine owner's nodes", "kind", kind, "name", name, "namespace", namespace)
 		return false, err
 	}
 
@@ -576,6 +588,36 @@ func (r *MachineDeletionRemediationReconciler) getMachineOwnerNodes(ctx context.
 	return machineOwnerNodes, nil
 }
 
+func (r *MachineDeletionRemediationReconciler) getMachineNameNsFromCR(ctx context.Context, remediation *v1alpha1.MachineDeletionRemediation) (machineName, machineNs string, err error) {
+	var node *v1.Node
+	node, err = r.getNodeFromCR(ctx, remediation)
+	if err != nil {
+		if apiErrors.IsNotFound(err) {
+			r.Log.Error(err, nodeNotFoundErrorMsg, "node name", remediation.Name)
+			err = nodeNotFoundError
+		}
+		return "", "", err
+	}
+
+	machineName, machineNs, err = getMachineNameNsFromNode(node)
+	if err != nil {
+		r.Log.Error(err, "could not get Machine Name NS from Node", "node", node.Name, "annotations", node.GetAnnotations())
+		return "", "", unrecoverableError
+	}
+	return machineName, machineNs, nil
+}
+
+func (r *MachineDeletionRemediationReconciler) getMachineNameNsFromOwnerReference(ctx context.Context, remediation *v1alpha1.MachineDeletionRemediation) (machineName, machineNs string) {
+	for _, owner := range remediation.GetOwnerReferences() {
+		if owner.Kind == machineKind {
+			machineName, machineNs = owner.Name, remediation.Namespace
+			break
+		}
+	}
+
+	return machineName, machineNs
+}
+
 func getMachineNameNsFromNode(node *v1.Node) (string, string, error) {
 	var nodeAnnotations map[string]string
 	if nodeAnnotations = node.Annotations; nodeAnnotations == nil {
@@ -624,4 +666,19 @@ func (r *MachineDeletionRemediationReconciler) getMachineOwnerSpecReplicas(ctx c
 		return 0, errors.Wrap(unrecoverableError, err.Error())
 	}
 	return int(replicas), nil
+}
+
+func (r *MachineDeletionRemediationReconciler) getMachineKindAndNamespace(ctx context.Context) (kind, namespace string, err error) {
+	machines := &machinev1beta1.MachineList{}
+	if err = r.List(ctx, machines); err != nil {
+		r.Log.Error(err, "could not list Machines")
+		return "", "", err
+	}
+
+	if len(machines.Items) == 0 {
+		err = fmt.Errorf("Could not get Machine Namespace: no Machines found")
+		return "", "", err
+	}
+
+	return machines.Items[0].Kind, machines.Items[0].Namespace, nil
 }

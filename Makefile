@@ -34,6 +34,7 @@ SORT_IMPORTS_VERSION = v0.2.1
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 DEFAULT_VERSION := 0.0.1
 VERSION ?= $(DEFAULT_VERSION)
+REPLACES_VERSION ?= $(VERSION)
 export VERSION
 
 # CHANNELS define the bundle channels used in the bundle.
@@ -297,11 +298,19 @@ export ICON_BASE64 ?= ${DEFAULT_ICON_BASE64}
 export CSV="./bundle/manifests/$(OPERATOR_NAME).clusterserviceversion.yaml"
 
 .PHONY: bundle-update
-bundle-update: ## Update containerImage, createdAt, and icon fields in the bundle's CSV, then validate the bundle directory
+bundle-update: verify-previous-version ## Update CSV fields and validate the bundle directory
 	sed -r -i "s|containerImage: .*|containerImage: $(IMG)|;" ${CSV}
 	sed -r -i "s|createdAt: .*|createdAt: \"`date '+%Y-%m-%d %T'`\"|;" ${CSV}
 	sed -r -i "s|base64data:.*|base64data: ${ICON_BASE64}|;" ${CSV}
+	sed -r -i "s|replaces: .*|replaces: machine-deletion-remediation.v${REPLACES_VERSION}|;" ${CSV}
 	$(MAKE) bundle-validate
+
+.PHONY: verify-previous-version
+verify-previous-version: ## Verifies that PREVIOUS_VERSION variable is set
+	@if [ $(VERSION) != $(DEFAULT_VERSION) ] && [ $(PREVIOUS_VERSION) = $(DEFAULT_VERSION) ]; then \
+  			echo "Error: PREVIOUS_VERSION must be set for the selected VERSION"; \
+    		exit 1; \
+    fi
 
 .PHONY: bundle-community
 bundle-community: ## Update displayName field in the bundle's CSV

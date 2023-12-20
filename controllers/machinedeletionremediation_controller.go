@@ -295,26 +295,18 @@ func (r *MachineDeletionRemediationReconciler) getMachine(ctx context.Context, r
 		return nil, unrecoverableError
 	}
 
-	// If the Machine's Name is not in the annotation, it means that it must come from the other two sources and in
-	// turns it means that the Machine must exist in the cluster, otherwise an error is returned.
+	// If the Machine's Name is not in the annotation, it means that it must come from the one of the other two
+	// sources and in turns it means that the Machine must exist in the cluster, otherwise an error is returned.
 	mustExist := machineName == ""
-
-	if machineName == "" && len(remediation.GetOwnerReferences()) > 0 {
-		machineName, machineNs = r.getMachineNameNsFromOwnerReference(ctx, remediation)
-		if machineName != "" {
-			r.Log.Info("MHC created CR: target machine is CR ownerReference", "machine", machineName, "namespace", machineNs)
-		}
-	}
-
 	if machineName == "" {
-		r.Log.Info("trying to get target Machine from the Node", "node", remediation.Name)
-		machineName, machineNs, err = r.getMachineNameNsFromRemediationName(ctx, remediation)
-		if err != nil {
-			if apiErrors.IsNotFound(err) {
-				r.Log.Error(err, nodeNotFoundErrorMsg, "node name", remediation.Name)
-				err = nodeNotFoundError
+		if machineName, machineNs = r.getMachineNameNsFromOwnerReference(ctx, remediation); machineName == "" {
+			if machineName, machineNs, err = r.getMachineNameNsFromRemediationName(ctx, remediation); err != nil {
+				if apiErrors.IsNotFound(err) {
+					r.Log.Error(err, nodeNotFoundErrorMsg, "node name", remediation.Name)
+					err = nodeNotFoundError
+				}
+				return nil, err
 			}
-			return nil, err
 		}
 	}
 
@@ -608,6 +600,7 @@ func (r *MachineDeletionRemediationReconciler) getMachineNameNsFromRemediationNa
 func (r *MachineDeletionRemediationReconciler) getMachineNameNsFromOwnerReference(ctx context.Context, remediation *v1alpha1.MachineDeletionRemediation) (machineName, machineNs string) {
 	for _, owner := range remediation.GetOwnerReferences() {
 		if owner.Kind == "Machine" {
+			r.Log.Info("remediation's ownerReference has Machine Kind", "machine", machineName, "namespace", machineNs)
 			machineName, machineNs = owner.Name, remediation.Namespace
 			break
 		}

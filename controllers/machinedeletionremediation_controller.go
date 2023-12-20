@@ -308,7 +308,7 @@ func (r *MachineDeletionRemediationReconciler) getMachine(ctx context.Context, r
 
 	if machineName == "" {
 		r.Log.Info("trying to get target Machine from the Node", "node", remediation.Name)
-		machineName, machineNs, err = r.getMachineNameNsFromCR(ctx, remediation)
+		machineName, machineNs, err = r.getMachineNameNsFromRemediationName(ctx, remediation)
 		if err != nil {
 			if apiErrors.IsNotFound(err) {
 				r.Log.Error(err, nodeNotFoundErrorMsg, "node name", remediation.Name)
@@ -586,7 +586,7 @@ func (r *MachineDeletionRemediationReconciler) getMachineOwnerNodes(ctx context.
 	return machineOwnerNodes, nil
 }
 
-func (r *MachineDeletionRemediationReconciler) getMachineNameNsFromCR(ctx context.Context, remediation *v1alpha1.MachineDeletionRemediation) (machineName, machineNs string, err error) {
+func (r *MachineDeletionRemediationReconciler) getMachineNameNsFromRemediationName(ctx context.Context, remediation *v1alpha1.MachineDeletionRemediation) (machineName, machineNs string, err error) {
 	var node *v1.Node
 	node, err = r.getNodeFromCR(ctx, remediation)
 	if err != nil {

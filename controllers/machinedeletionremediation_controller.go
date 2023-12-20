@@ -665,18 +665,3 @@ func (r *MachineDeletionRemediationReconciler) getMachineOwnerSpecReplicas(ctx c
 	}
 	return int(replicas), nil
 }
-
-func (r *MachineDeletionRemediationReconciler) getMachineKindAndNamespace(ctx context.Context) (kind, namespace string, err error) {
-	machines := &machinev1beta1.MachineList{}
-	if err = r.List(ctx, machines); err != nil {
-		r.Log.Error(err, "could not list Machines")
-		return "", "", err
-	}
-
-	if len(machines.Items) == 0 {
-		err = fmt.Errorf("Could not get Machine Namespace: no Machines found")
-		return "", "", err
-	}
-
-	return machines.Items[0].Kind, machines.Items[0].Namespace, nil
-}

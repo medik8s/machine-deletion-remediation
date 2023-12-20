@@ -63,8 +63,6 @@ const (
 	machineDeletedOnCloudProviderMessage     = "Machine will be deleted and the unhealthy node replaced. This is a Cloud cluster provider: the new node is expected to have a new name"
 	machineDeletedOnBareMetalProviderMessage = "Machine will be deleted and the unhealthy node replaced. This is a BareMetal cluster provider: the new node is NOT expected to have a new name"
 	machineDeletedOnUnknownProviderMessage   = "Machine will be deleted and the unhealthy node replaced. Unknown cluster provider: no information about the new node's name"
-	// Machine Kind
-	machineKind = "Machine"
 )
 
 type conditionChangeReason string
@@ -609,7 +607,7 @@ func (r *MachineDeletionRemediationReconciler) getMachineNameNsFromCR(ctx contex
 
 func (r *MachineDeletionRemediationReconciler) getMachineNameNsFromOwnerReference(ctx context.Context, remediation *v1alpha1.MachineDeletionRemediation) (machineName, machineNs string) {
 	for _, owner := range remediation.GetOwnerReferences() {
-		if owner.Kind == machineKind {
+		if owner.Kind == "Machine" {
 			machineName, machineNs = owner.Name, remediation.Namespace
 			break
 		}

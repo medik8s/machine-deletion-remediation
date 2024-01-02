@@ -61,6 +61,7 @@ const (
 	failedToDeleteMachineError         = "failed to delete machine of node name: %s"
 	nodeNotFoundErrorMsg               = "failed to fetch node"
 	machineNotFoundErrorMsg            = "failed to fetch machine of node"
+	noControllerOwnerErrorMsg          = "ignoring remediation of the machine: the machine has no controller owner"
 	// Cluster Provider messages
 	machineDeletedOnCloudProviderMessage     = "Machine will be deleted and the unhealthy node replaced. This is a Cloud cluster provider: the new node is expected to have a new name"
 	machineDeletedOnBareMetalProviderMessage = "Machine will be deleted and the unhealthy node replaced. This is a BareMetal cluster provider: the new node is NOT expected to have a new name"
@@ -228,9 +229,8 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 	}
 
 	if !hasControllerOwner(machine) {
-		msg := "ignoring remediation of the machine: the machine has no controller owner"
-		log.Info(msg, "machine", machine.GetName(), "remediation name", mdr.Name)
-		commonevents.WarningEvent(r.Recorder, mdr, string(remediationSkippedNoControllerOwner), msg)
+		log.Info(noControllerOwnerErrorMsg, "machine", machine.GetName(), "remediation name", mdr.Name)
+		commonevents.WarningEvent(r.Recorder, mdr, string(remediationSkippedNoControllerOwner), noControllerOwnerErrorMsg)
 		_, err = r.updateConditions(remediationSkippedNoControllerOwner, mdr)
 		return ctrl.Result{}, err
 	}

@@ -51,6 +51,7 @@ metadata:
     description: Machine Deletion Remediation operator for reprovisioning unhealthy
       nodes using the Machine API.
     olm.skipRange: '>=0.0.1'
+    operatorframework.io/suggested-namespace: openshift-workload-availability
     operators.operatorframework.io/builder: operator-sdk-v1.30.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     repository: https://github.com/medik8s/machine-deletion-remediation
@@ -211,10 +212,11 @@ spec:
               containers:
               - args:
                 - --secure-listen-address=0.0.0.0:8443
+                - --http2-disable
                 - --upstream=http://127.0.0.1:8080/
                 - --logtostderr=true
                 - --v=10
-                image: gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
+                image: quay.io/brancz/kube-rbac-proxy:v0.15.0
                 name: kube-rbac-proxy
                 ports:
                 - containerPort: 8443

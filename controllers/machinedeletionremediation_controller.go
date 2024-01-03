@@ -297,8 +297,8 @@ func (r *MachineDeletionRemediationReconciler) getMachine(ctx context.Context, r
 
 	// If the Machine's Name is not in the annotation, it means that it must come from the one of the other two
 	// sources and in turns it means that the Machine must exist in the cluster, otherwise an error is returned.
-	mustExist := machineName == ""
-	if machineName == "" {
+	isUnhandledMachine := machineName == ""
+	if isUnhandledMachine {
 		if machineName, machineNs = r.getMachineNameNsFromOwnerReference(ctx, remediation); machineName == "" {
 			if machineName, machineNs, err = r.getMachineNameNsFromRemediationName(ctx, remediation); err != nil {
 				if apiErrors.IsNotFound(err) {
@@ -310,20 +310,17 @@ func (r *MachineDeletionRemediationReconciler) getMachine(ctx context.Context, r
 		}
 	}
 
-	machine := &machinev1beta1.Machine{}
-	key := client.ObjectKey{
-		Name:      machineName,
-		Namespace: machineNs,
-	}
-
 	r.Log.Info("Looking for the target Machine", "machine", machineName, "namespace", machineNs)
-	if err := r.Get(ctx, key, machine); err != nil {
+	machine := &machinev1beta1.Machine{}
+	if err := r.Get(ctx, client.ObjectKey{Name: machineName, Namespace: machineNs}, machine); err != nil {
 		if !apiErrors.IsNotFound(err) {
 			return nil, err
 		}
 
-		// Machine was not found
-		if mustExist {
+		// Machine was not found in the cluster, one the following cases must apply:
+		// - if it was already handled, it might have been just deleted upon our request
+		// - otherwise, it must exist in the cluster and if not an error is returned.
+		if isUnhandledMachine {
 			r.Log.Error(err, machineNotFoundErrorMsg, "node", remediation.Name, "machine", machineName)
 			return nil, machineNotFoundError
 		}

@@ -78,6 +78,10 @@ const (
 	remediationSkippedMachineNotFound   conditionChangeReason = "RemediationSkippedMachineNotFound"
 	remediationSkippedNoControllerOwner conditionChangeReason = "RemediationSkippedNoControllerOwner"
 	remediationFailed                   conditionChangeReason = "RemediationFailed"
+
+	// Event reasons and messages
+	machineDeletionRequestedEventReason  = "MachineDeletionRequested"
+	machineDeletionRequestedEventMessage = "requesting machine deletion"
 )
 
 var (
@@ -241,7 +245,7 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 		return ctrl.Result{}, errors.Wrapf(err, "failed to save Machine's name and namespace")
 	}
 
-	commonevents.NormalEvent(r.Recorder, mdr, "MachineDeletionRequested", "requesting machine deletion")
+	commonevents.NormalEvent(r.Recorder, mdr, machineDeletionRequestedEventReason, machineDeletionRequestedEventMessage)
 	log.Info("request machine deletion", "machine", machine.GetName(), "remediation name", mdr.Name)
 	err = r.Delete(ctx, machine)
 	if err != nil {

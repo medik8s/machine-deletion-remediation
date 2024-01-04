@@ -146,7 +146,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationSkippedNodeNotFound},
 						{commonconditions.SucceededType, metav1.ConditionFalse, remediationSkippedNodeNotFound}})
 					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
-					verifyEvent("Warning", "RemediationSkippedNodeNotFound", "failed to fetch node")
+					verifyEvent(v1.EventTypeWarning, "RemediationSkippedNodeNotFound", "failed to fetch node")
 				})
 			})
 
@@ -163,7 +163,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 						{commonconditions.SucceededType, metav1.ConditionFalse, remediationSkippedNoControllerOwner},
 						// Cluster provider is not set in this test
 						{commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason}})
-					verifyEvent("Warning", "RemediationSkippedNoControllerOwner", noControllerOwnerErrorMsg)
+					verifyEvent(v1.EventTypeWarning, "RemediationSkippedNoControllerOwner", noControllerOwnerErrorMsg)
 				})
 			})
 
@@ -182,7 +182,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 						{commonconditions.SucceededType, metav1.ConditionFalse, remediationSkippedNoControllerOwner},
 						// Cluster provider is not set in this test
 						{commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason}})
-					verifyEvent("Warning", "RemediationSkippedNoControllerOwner", noControllerOwnerErrorMsg)
+					verifyEvent(v1.EventTypeWarning, "RemediationSkippedNoControllerOwner", noControllerOwnerErrorMsg)
 				})
 			})
 
@@ -203,7 +203,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 						// Cluster provider is not set in this test
 						{commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason}})
 
-					verifyEvent("Warning", "RemediationSkippedNoControllerOwner", noControllerOwnerErrorMsg)
+					verifyEvent(v1.EventTypeWarning, "RemediationSkippedNoControllerOwner", noControllerOwnerErrorMsg)
 				})
 			})
 
@@ -279,7 +279,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 						{commonconditions.SucceededType, metav1.ConditionTrue, remediationFinishedMachineDeleted},
 						// Cluster provider is not set in this test
 						{commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason}})
-					verifyEvent("Normal", "RemediationFinished", "Remediation finished")
+					verifyEvent(v1.EventTypeNormal, "RemediationFinished", "Remediation finished")
 				})
 			})
 
@@ -291,7 +291,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 				})
 				It("sets PermanentNodeDeletionExpected condition to false", func() {
 					verifyConditionMatches(commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionFalse, v1alpha1.MachineDeletionOnBareMetalProviderReason)
-					verifyEvent("Normal",
+					verifyEvent(v1.EventTypeNormal,
 						"PermanentNodeDeletionExpected",
 						"Machine will be deleted and the unhealthy node replaced. This is a BareMetal cluster provider: the new node is NOT expected to have a new name")
 				})
@@ -305,7 +305,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 				})
 				It("sets PermanentNodeDeletionExpected condition to true", func() {
 					verifyConditionMatches(commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionTrue, v1alpha1.MachineDeletionOnCloudProviderReason)
-					verifyEvent("Normal",
+					verifyEvent(v1.EventTypeNormal,
 						"PermanentNodeDeletionExpected",
 						"Machine will be deleted and the unhealthy node replaced. This is a Cloud cluster provider: the new node is expected to have a new name")
 				})
@@ -320,7 +320,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 				})
 				It("sets PermanentNodeDeletionExpected condition to false", func() {
 					verifyConditionMatches(commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason)
-					verifyEvent("Normal",
+					verifyEvent(v1.EventTypeNormal,
 						"PermanentNodeDeletionExpected",
 						"Machine will be deleted and the unhealthy node replaced. Unknown cluster provider: no information about the new node's name")
 				})
@@ -342,7 +342,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationSkippedNodeNotFound},
 						{commonconditions.SucceededType, metav1.ConditionFalse, remediationSkippedNodeNotFound}})
 					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
-					verifyEvent("Warning", "RemediationSkippedNodeNotFound", "failed to fetch node")
+					verifyEvent(v1.EventTypeWarning, "RemediationSkippedNodeNotFound", "failed to fetch node")
 				})
 			})
 
@@ -362,7 +362,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationFailed},
 						{commonconditions.SucceededType, metav1.ConditionFalse, remediationFailed}})
 					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
-					verifyEvent("Warning", "RemediationFailed", unrecoverableError.Error())
+					verifyEvent(v1.EventTypeWarning, "RemediationFailed", unrecoverableError.Error())
 				})
 			})
 
@@ -382,7 +382,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationFailed},
 						{commonconditions.SucceededType, metav1.ConditionFalse, remediationFailed}})
 					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
-					verifyEvent("Warning", "RemediationFailed", unrecoverableError.Error())
+					verifyEvent(v1.EventTypeWarning, "RemediationFailed", unrecoverableError.Error())
 				})
 			})
 
@@ -402,7 +402,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationFailed},
 						{commonconditions.SucceededType, metav1.ConditionFalse, remediationFailed}})
 					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
-					verifyEvent("Warning", "RemediationFailed", unrecoverableError.Error())
+					verifyEvent(v1.EventTypeWarning, "RemediationFailed", unrecoverableError.Error())
 				})
 			})
 
@@ -422,7 +422,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationSkippedMachineNotFound},
 						{commonconditions.SucceededType, metav1.ConditionFalse, remediationSkippedMachineNotFound}})
 					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
-					verifyEvent("Warning", "RemediationSkippedMachineNotFound", "failed to fetch machine of node")
+					verifyEvent(v1.EventTypeWarning, "RemediationSkippedMachineNotFound", "failed to fetch machine of node")
 				})
 			})
 
@@ -443,7 +443,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					// beginning. As a result, the first attempt to get the Machine is via CR's annotation, it fails,
 					// and the condition cannot be set. Normally, the first attempt is via Node's annotation instead.
 					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
-					verifyEvent("Warning", "RemediationFailed", unrecoverableError.Error())
+					verifyEvent(v1.EventTypeWarning, "RemediationFailed", unrecoverableError.Error())
 				})
 			})
 
@@ -482,7 +482,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					// beginning. As a result, the first attempt to get the Machine is via CR's annotation, it fails,
 					// and the condition cannot be set. Normally, the first attempt is via Node's annotation instead.
 					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
-					verifyEvent("Normal", "RemediationStopped", "NHC added the timed-out annotation, remediation will be stopped")
+					verifyEvent(v1.EventTypeNormal, "RemediationStopped", "NHC added the timed-out annotation, remediation will be stopped")
 				})
 			})
 		})

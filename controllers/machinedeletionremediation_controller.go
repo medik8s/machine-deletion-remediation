@@ -245,13 +245,13 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 		return ctrl.Result{}, errors.Wrapf(err, "failed to save Machine's name and namespace")
 	}
 
-	commonevents.NormalEvent(r.Recorder, mdr, machineDeletionRequestedEventReason, machineDeletionRequestedEventMessage)
 	log.Info("request machine deletion", "machine", machine.GetName(), "remediation name", mdr.Name)
 	err = r.Delete(ctx, machine)
 	if err != nil {
 		log.Error(err, "failed to delete machine", "machine", machine.GetName())
 		return ctrl.Result{}, err
 	}
+	commonevents.NormalEvent(r.Recorder, mdr, machineDeletionRequestedEventReason, machineDeletionRequestedEventMessage)
 
 	// requeue immediately to check machine deletion progression
 	return ctrl.Result{Requeue: true}, nil

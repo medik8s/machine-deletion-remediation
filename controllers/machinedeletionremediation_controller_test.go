@@ -512,7 +512,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 						// Cluster provider is not set in this test
 						{commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason}})
 					verifyEvents([]expectedEvent{
-						{v1.EventTypeNormal, machineDeletionRequestedEventReason, machineDeletionRequestedEventMessage, true},
+						{v1.EventTypeNormal, machineDeletionRequestedEventReason, machineDeletionRequestedEventMessage, false},
 					})
 				})
 			})

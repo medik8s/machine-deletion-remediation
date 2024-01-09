@@ -105,9 +105,10 @@ func main() {
 	}
 
 	if err = (&controllers.MachineDeletionRemediationReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("MachineDeletionRemediation"),
-		Scheme: mgr.GetScheme(),
+		Client:   mgr.GetClient(),
+		Log:      ctrl.Log.WithName("controllers").WithName("MachineDeletionRemediation"),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("MachineDeletionRemediation"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MachineDeletionRemediation")
 		os.Exit(1)

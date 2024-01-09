@@ -25,6 +25,7 @@ import (
 	"github.com/go-logr/logr"
 	commonannotations "github.com/medik8s/common/pkg/annotations"
 	commonconditions "github.com/medik8s/common/pkg/conditions"
+	commonevents "github.com/medik8s/common/pkg/events"
 	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
@@ -34,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -59,6 +61,7 @@ const (
 	failedToDeleteMachineError         = "failed to delete machine of node name: %s"
 	nodeNotFoundErrorMsg               = "failed to fetch node"
 	machineNotFoundErrorMsg            = "failed to fetch machine of node"
+	noControllerOwnerErrorMsg          = "ignoring remediation of the machine: the machine has no controller owner"
 	// Cluster Provider messages
 	machineDeletedOnCloudProviderMessage     = "Machine will be deleted and the unhealthy node replaced. This is a Cloud cluster provider: the new node is expected to have a new name"
 	machineDeletedOnBareMetalProviderMessage = "Machine will be deleted and the unhealthy node replaced. This is a BareMetal cluster provider: the new node is NOT expected to have a new name"
@@ -74,7 +77,11 @@ const (
 	remediationSkippedNodeNotFound      conditionChangeReason = "RemediationSkippedNodeNotFound"
 	remediationSkippedMachineNotFound   conditionChangeReason = "RemediationSkippedMachineNotFound"
 	remediationSkippedNoControllerOwner conditionChangeReason = "RemediationSkippedNoControllerOwner"
-	remediationFailed                   conditionChangeReason = "remediationFailed"
+	remediationFailed                   conditionChangeReason = "RemediationFailed"
+
+	// Event reasons and messages
+	machineDeletionRequestedEventReason  = "MachineDeletionRequested"
+	machineDeletionRequestedEventMessage = "requesting machine deletion"
 )
 
 var (
@@ -86,8 +93,9 @@ var (
 // MachineDeletionRemediationReconciler reconciles a MachineDeletionRemediation object
 type MachineDeletionRemediationReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	Log      logr.Logger
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 //+kubebuilder:rbac:groups=machine-deletion-remediation.medik8s.io,resources=machinedeletionremediations,verbs=get;list;watch;create;update;patch;delete
@@ -127,9 +135,11 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 			finalResult.RequeueAfter = time.Second
 		}
 	}()
+	commonevents.RemediationStarted(r.Recorder, mdr)
 
 	if r.isTimedOutByNHC(mdr) {
 		log.Info("NHC time out annotation found, stopping remediation")
+		commonevents.RemediationStoppedByNHC(r.Recorder, mdr)
 		_, err = r.updateConditions(remediationTimedOutByNhc, mdr)
 		return ctrl.Result{}, err
 	}
@@ -148,10 +158,13 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 		// situation. An error is returned only if it does not match the following custom errors, or
 		// updateConditions fails.
 		if err == nodeNotFoundError {
+			commonevents.WarningEvent(r.Recorder, mdr, string(remediationSkippedNodeNotFound), nodeNotFoundErrorMsg)
 			_, err = r.updateConditions(remediationSkippedNodeNotFound, mdr)
 		} else if err == machineNotFoundError {
+			commonevents.WarningEvent(r.Recorder, mdr, string(remediationSkippedMachineNotFound), machineNotFoundErrorMsg)
 			_, err = r.updateConditions(remediationSkippedMachineNotFound, mdr)
 		} else if err == unrecoverableError {
+			commonevents.WarningEvent(r.Recorder, mdr, string(remediationFailed), unrecoverableError.Error())
 			_, err = r.updateConditions(remediationFailed, mdr)
 		}
 
@@ -167,13 +180,18 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 	// verify nodes count restoration even if machine == nil.
 	if machine == nil || machine.GetCreationTimestamp().After(mdr.GetCreationTimestamp().Time) {
 		if isRestored, err := r.isExpectedNodesNumberRestored(ctx, mdr); err != nil {
-			log.Error(err, "could not verify if node was restored")
+			msg := "could not verify if node was restored"
+			log.Error(err, msg)
+			commonevents.WarningEvent(r.Recorder, mdr, "unableToVerifyNodesCount", err.Error())
 			if err == unrecoverableError {
 				return ctrl.Result{}, nil
 			}
 			return ctrl.Result{}, err
 		} else if isRestored {
 			_, err = r.updateConditions(remediationFinishedMachineDeleted, mdr)
+			if err == nil {
+				commonevents.RemediationFinished(r.Recorder, mdr)
+			}
 			return ctrl.Result{}, err
 		}
 		log.Info("waiting for the nodes count to be re-provisioned")
@@ -204,6 +222,7 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 
 	if updateRequired := r.setPermanentNodeDeletionExpectedCondition(status, mdr); updateRequired {
 		log.Info(permanentNodeDeletionExpectedMsg)
+		commonevents.NormalEvent(r.Recorder, mdr, "PermanentNodeDeletionExpected", permanentNodeDeletionExpectedMsg)
 		return ctrl.Result{RequeueAfter: time.Second}, nil
 	}
 
@@ -214,7 +233,8 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 	}
 
 	if !hasControllerOwner(machine) {
-		log.Info("ignoring remediation of the machine: the machine has no controller owner", "machine", machine.GetName())
+		log.Info(noControllerOwnerErrorMsg, "machine", machine.GetName(), "remediation name", mdr.Name)
+		commonevents.WarningEvent(r.Recorder, mdr, string(remediationSkippedNoControllerOwner), noControllerOwnerErrorMsg)
 		_, err = r.updateConditions(remediationSkippedNoControllerOwner, mdr)
 		return ctrl.Result{}, err
 	}
@@ -225,12 +245,13 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 		return ctrl.Result{}, errors.Wrapf(err, "failed to save Machine's name and namespace")
 	}
 
-	log.Info("request machine deletion", "machine", machine.GetName())
+	log.Info("request machine deletion", "machine", machine.GetName(), "remediation name", mdr.Name)
 	err = r.Delete(ctx, machine)
 	if err != nil {
 		log.Error(err, "failed to delete machine", "machine", machine.GetName())
 		return ctrl.Result{}, err
 	}
+	commonevents.NormalEvent(r.Recorder, mdr, machineDeletionRequestedEventReason, machineDeletionRequestedEventMessage)
 
 	// requeue immediately to check machine deletion progression
 	return ctrl.Result{Requeue: true}, nil

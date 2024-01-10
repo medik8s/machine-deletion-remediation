@@ -11,6 +11,7 @@ metadata:
       nodes using the Machine API.
     olm.skipRange: '>=0.0.1'
     operatorframework.io/suggested-namespace: openshift-workload-availability
+    operatorframework.io/suggested-namespace-template: '{"kind":"Namespace","apiVersion":"v1","metadata":{"name":"openshift-workload-availability","annotations":{"openshift.io/node-selector":""}}}'
     repository: https://github.com/medik8s/machine-deletion-remediation
     support: Medik8s
   name: machine-deletion-remediation.v0.0.0

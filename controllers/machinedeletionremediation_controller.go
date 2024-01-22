@@ -618,8 +618,8 @@ func (r *MachineDeletionRemediationReconciler) getMachineNameNsFromRemediationNa
 func (r *MachineDeletionRemediationReconciler) getMachineNameNsFromOwnerReference(ctx context.Context, remediation *v1alpha1.MachineDeletionRemediation) (machineName, machineNs string) {
 	for _, owner := range remediation.GetOwnerReferences() {
 		if owner.Kind == "Machine" {
-			r.Log.Info("remediation's ownerReference has Machine Kind", "machine", machineName, "namespace", machineNs)
 			machineName, machineNs = owner.Name, remediation.Namespace
+			r.Log.Info("remediation's ownerReference has Machine Kind", "machine", machineName, "namespace", machineNs)
 			break
 		}
 	}

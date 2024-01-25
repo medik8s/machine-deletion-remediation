@@ -78,10 +78,6 @@ const (
 	remediationSkippedMachineNotFound   conditionChangeReason = "RemediationSkippedMachineNotFound"
 	remediationSkippedNoControllerOwner conditionChangeReason = "RemediationSkippedNoControllerOwner"
 	remediationFailed                   conditionChangeReason = "RemediationFailed"
-
-	// Event reasons and messages
-	machineDeletionRequestedEventReason  = "MachineDeletionRequested"
-	machineDeletionRequestedEventMessage = "requesting machine deletion"
 )
 
 var (
@@ -135,7 +131,6 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 			finalResult.RequeueAfter = time.Second
 		}
 	}()
-	commonevents.RemediationStarted(r.Recorder, mdr)
 
 	if r.isTimedOutByNHC(mdr) {
 		log.Info("NHC time out annotation found, stopping remediation")
@@ -251,7 +246,8 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 		log.Error(err, "failed to delete machine", "machine", machine.GetName())
 		return ctrl.Result{}, err
 	}
-	commonevents.NormalEvent(r.Recorder, mdr, machineDeletionRequestedEventReason, machineDeletionRequestedEventMessage)
+	// The actual remediation has just started. This should be reached only once per CR.
+	commonevents.RemediationStarted(r.Recorder, mdr)
 
 	// requeue immediately to check machine deletion progression
 	return ctrl.Result{Requeue: true}, nil

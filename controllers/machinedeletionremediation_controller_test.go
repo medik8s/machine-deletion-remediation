@@ -148,7 +148,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
 					verifyEvents([]expectedEvent{
 						{v1.EventTypeWarning, "RemediationSkippedNodeNotFound", "failed to fetch node", true},
-						{v1.EventTypeNormal, machineDeletionRequestedEventReason, machineDeletionRequestedEventMessage, false},
+						{v1.EventTypeNormal, "RemediationStarted", "Remediation started", false},
 					})
 				})
 			})
@@ -168,7 +168,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 						{commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason}})
 					verifyEvents([]expectedEvent{
 						{v1.EventTypeWarning, "RemediationSkippedNoControllerOwner", noControllerOwnerErrorMsg, true},
-						{v1.EventTypeNormal, machineDeletionRequestedEventReason, machineDeletionRequestedEventMessage, false},
+						{v1.EventTypeNormal, "RemediationStarted", "Remediation started", false},
 					})
 				})
 			})
@@ -190,7 +190,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 						{commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason}})
 					verifyEvents([]expectedEvent{
 						{v1.EventTypeWarning, "RemediationSkippedNoControllerOwner", noControllerOwnerErrorMsg, true},
-						{v1.EventTypeNormal, machineDeletionRequestedEventReason, machineDeletionRequestedEventMessage, false},
+						{v1.EventTypeNormal, "RemediationStarted", "Remediation started", false},
 					})
 				})
 			})
@@ -214,7 +214,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 
 					verifyEvents([]expectedEvent{
 						{v1.EventTypeWarning, "RemediationSkippedNoControllerOwner", noControllerOwnerErrorMsg, true},
-						{v1.EventTypeNormal, machineDeletionRequestedEventReason, machineDeletionRequestedEventMessage, false},
+						{v1.EventTypeNormal, "RemediationStarted", "Remediation started", false},
 					})
 				})
 			})
@@ -257,7 +257,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 						// Cluster provider is not set in this test
 						{commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason}})
 					verifyEvents([]expectedEvent{
-						{v1.EventTypeNormal, machineDeletionRequestedEventReason, machineDeletionRequestedEventMessage, true},
+						{v1.EventTypeNormal, "RemediationStarted", "Remediation started", true},
 					})
 				})
 			})
@@ -295,7 +295,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 						// Cluster provider is not set in this test
 						{commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason}})
 					verifyEvents([]expectedEvent{
-						{v1.EventTypeNormal, machineDeletionRequestedEventReason, machineDeletionRequestedEventMessage, true},
+						{v1.EventTypeNormal, "RemediationStarted", "Remediation started", true},
 						{v1.EventTypeNormal, "RemediationFinished", "Remediation finished", true},
 					})
 				})
@@ -371,7 +371,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
 					verifyEvents([]expectedEvent{
 						{v1.EventTypeWarning, "RemediationSkippedNodeNotFound", "failed to fetch node", true},
-						{v1.EventTypeNormal, machineDeletionRequestedEventReason, machineDeletionRequestedEventMessage, false},
+						{v1.EventTypeNormal, "RemediationStarted", "Remediation started", false},
 					})
 				})
 			})
@@ -394,7 +394,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
 					verifyEvents([]expectedEvent{
 						{v1.EventTypeWarning, "RemediationFailed", unrecoverableError.Error(), true},
-						{v1.EventTypeNormal, machineDeletionRequestedEventReason, machineDeletionRequestedEventMessage, false},
+						{v1.EventTypeNormal, "RemediationStarted", "Remediation started", false},
 					})
 				})
 			})
@@ -417,7 +417,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
 					verifyEvents([]expectedEvent{
 						{v1.EventTypeWarning, "RemediationFailed", unrecoverableError.Error(), true},
-						{v1.EventTypeNormal, machineDeletionRequestedEventReason, machineDeletionRequestedEventMessage, false},
+						{v1.EventTypeNormal, "RemediationStarted", "Remediation started", false},
 					})
 				})
 			})
@@ -440,7 +440,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
 					verifyEvents([]expectedEvent{
 						{v1.EventTypeWarning, "RemediationFailed", unrecoverableError.Error(), true},
-						{v1.EventTypeNormal, machineDeletionRequestedEventReason, machineDeletionRequestedEventMessage, false},
+						{v1.EventTypeNormal, "RemediationStarted", "Remediation started", false},
 					})
 				})
 			})
@@ -463,7 +463,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
 					verifyEvents([]expectedEvent{
 						{v1.EventTypeWarning, "RemediationSkippedMachineNotFound", "failed to fetch machine of node", true},
-						{v1.EventTypeNormal, machineDeletionRequestedEventReason, machineDeletionRequestedEventMessage, false},
+						{v1.EventTypeNormal, "RemediationStarted", "Remediation started", false},
 					})
 				})
 			})
@@ -487,7 +487,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
 					verifyEvents([]expectedEvent{
 						{v1.EventTypeWarning, "RemediationFailed", unrecoverableError.Error(), true},
-						{v1.EventTypeNormal, machineDeletionRequestedEventReason, machineDeletionRequestedEventMessage, false},
+						{v1.EventTypeNormal, "RemediationStarted", "Remediation started", false},
 					})
 				})
 			})
@@ -512,7 +512,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 						// Cluster provider is not set in this test
 						{commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason}})
 					verifyEvents([]expectedEvent{
-						{v1.EventTypeNormal, machineDeletionRequestedEventReason, machineDeletionRequestedEventMessage, false},
+						{v1.EventTypeNormal, "RemediationStarted", "Remediation started", false},
 					})
 				})
 			})
@@ -532,7 +532,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
 					verifyEvents([]expectedEvent{
 						{v1.EventTypeNormal, "RemediationStopped", "NHC added the timed-out annotation, remediation will be stopped", true},
-						{v1.EventTypeNormal, machineDeletionRequestedEventReason, machineDeletionRequestedEventMessage, false},
+						{v1.EventTypeNormal, "RemediationStarted", "Remediation started", false},
 					})
 				})
 			})
@@ -576,7 +576,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 						// Cluster provider is not set in this test
 						{commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason}})
 					verifyEvents([]expectedEvent{
-						{v1.EventTypeNormal, machineDeletionRequestedEventReason, machineDeletionRequestedEventMessage, true},
+						{v1.EventTypeNormal, "RemediationStarted", "Remediation started", true},
 					})
 				})
 			})
@@ -602,7 +602,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 						// Cluster provider is not set in this test
 						{commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason}})
 					verifyEvents([]expectedEvent{
-						{v1.EventTypeNormal, machineDeletionRequestedEventReason, machineDeletionRequestedEventMessage, true},
+						{v1.EventTypeNormal, "RemediationStarted", "Remediation started", true},
 					})
 				})
 			})

@@ -305,6 +305,14 @@ bundle-update: verify-previous-version ## Update CSV fields and validate the bun
 	sed -r -i "s|replaces: .*|replaces: machine-deletion-remediation.v${REPLACES_VERSION}|;" ${CSV}
 	$(MAKE) bundle-validate
 
+.PHONY: bundle-reset
+bundle-reset: ## Revert all version or build date related changes
+	VERSION=${DEFAULT_VERSION} IMG=$(IMAGE_TAG_BASE)-operator:latest; $(MAKE) manifests bundle
+	sed -r -i "s|containerImage: .*|containerImage: \"\"|;" ${CSV}
+	sed -r -i "s|createdAt: .*|createdAt: \"\"|;" ${CSV}
+	sed -r -i "s|base64data:.*|base64data: base64EncodedIcon|;" ${CSV}
+	sed -r -i "s|replaces: .*|replaces: machine-deletion-remediation.v${DEFAULT_VERSION}|;" ${CSV}
+
 .PHONY: verify-previous-version
 verify-previous-version: ## Verifies that PREVIOUS_VERSION variable is set
 	@if [ $(VERSION) != $(DEFAULT_VERSION) ] && [ $(PREVIOUS_VERSION) = $(DEFAULT_VERSION) ]; then \

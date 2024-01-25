@@ -4,25 +4,25 @@ SHELL := /bin/bash
 OPERATOR_NAME := machine-deletion-remediation
 
 ## Tool versions
-# OPERATOR_SDK versions at github.com/operator-framework/operator-sdk/releases
-OPERATOR_SDK_VERSION ?= v1.30.0
+# OPERATOR_SDK versions at https://github.com/operator-framework/operator-sdk/releases
+OPERATOR_SDK_VERSION ?= v1.32.0
 
 # OPM versions at https://github.com/operator-framework/operator-registry/releases
-OPM_VERSION = v1.28.0
+OPM_VERSION = v1.36.0
 
 # CONTROLLER_GEN versions at https://github.com/kubernetes-sigs/controller-tools/releases
-CONTROLLER_GEN_VERSION = v0.12.0
+CONTROLLER_GEN_VERSION = v0.14.0
 
 # KUSTOMIZE versions at https://github.com/kubernetes-sigs/kustomize/releases
 # note: update KUSTOMIZE_VERSION and KUSTOMIZE_API_VERSION accordingly.
 KUSTOMIZE_API_VERSION = v5
-KUSTOMIZE_VERSION = v5.0.0
+KUSTOMIZE_VERSION = v5.3.0
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.26
 
 # GoImports versions at https://pkg.go.dev/golang.org/x/tools/cmd/goimports?tab=versions
-GOIMPORTS_VERSION ?= v0.11.0
+GOIMPORTS_VERSION ?= v0.17.0
 
 # Sort-imports versions at https://github.com/slintes/sort-imports/releases
 SORT_IMPORTS_VERSION = v0.2.1

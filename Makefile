@@ -157,7 +157,7 @@ fix-imports: sort-imports ## Sort imports
 	$(SORT_IMPORTS) -w .
 
 .PHONY: verify-no-changes
-verify-no-changes: ## verify no there are no un-staged changes
+verify-no-changes: bundle-reset ## verify no there are no un-staged changes and remove unwanted changes to bundle
 	./hack/verify-diff.sh
 
 # Run tests

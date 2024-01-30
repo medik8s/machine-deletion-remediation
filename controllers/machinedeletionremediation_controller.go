@@ -52,8 +52,8 @@ const (
 	// MachineOwnerAnnotation contains Machine's ownerReference name and Kind
 	MachineOwnerAnnotation = "machine-deletion-remediation.medik8s.io/machineOwner"
 	// Infos
-	postponedMachineDeletionInfo  = "node-associated machine was not deleted yet"
-	successfulMachineDeletionInfo = "node-associated machine correctly deleted"
+	postponedMachineDeletionInfo  = "target machine was not deleted yet"
+	successfulMachineDeletionInfo = "target machine correctly deleted"
 	//Errors
 	noAnnotationsError                 = "failed to find machine annotation on node name: %s"
 	noMachineAnnotationError           = "failed to find openshift machine annotation on node name: %s"

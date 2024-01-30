@@ -330,7 +330,7 @@ bundle-push: ## Push the bundle image.
 	$(MAKE) docker-push IMG=$(BUNDLE_IMG)
 
 .PHONY: bundle-run
-export BUNDLE_RUN_NAMESPACE ?= openshift-operators
+export BUNDLE_RUN_NAMESPACE ?= openshift-workload-availability
 bundle-run: operator-sdk ## Run bundle image
 	$(OPERATOR_SDK) -n $(BUNDLE_RUN_NAMESPACE) run bundle $(BUNDLE_IMG)
 

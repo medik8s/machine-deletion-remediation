@@ -133,15 +133,13 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 	}()
 
 	if r.isTimedOutByNHC(mdr) {
-		updateRequired, err := r.updateConditions(remediationTimedOutByNhc, mdr)
-		if err == nil && updateRequired {
+		if updateRequired, err := r.updateConditions(remediationTimedOutByNhc, mdr); err != nil {
+			return ctrl.Result{}, err
+		} else if updateRequired {
 			log.Info("NHC time out annotation found, stopping remediation")
 			commonevents.RemediationStoppedByNHC(r.Recorder, mdr)
-		} else {
-			// Status.Condition and event already handled, nothing to do
 		}
-		// return error only if updateConditions fails
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
 	}
 
 	if updateRequired, err := r.updateConditions(remediationStarted, mdr); err != nil {
@@ -188,11 +186,12 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 			}
 			return ctrl.Result{}, err
 		} else if isRestored {
-			_, err = r.updateConditions(remediationFinishedMachineDeleted, mdr)
-			if err == nil {
+			if updateRequired, err := r.updateConditions(remediationFinishedMachineDeleted, mdr); err != nil {
+				return ctrl.Result{}, err
+			} else if updateRequired {
 				commonevents.RemediationFinished(r.Recorder, mdr)
 			}
-			return ctrl.Result{}, err
+			return ctrl.Result{}, nil
 		}
 		log.Info("waiting for the nodes count to be re-provisioned")
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil

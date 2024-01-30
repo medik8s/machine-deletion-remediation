@@ -133,9 +133,14 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 	}()
 
 	if r.isTimedOutByNHC(mdr) {
-		log.Info("NHC time out annotation found, stopping remediation")
-		commonevents.RemediationStoppedByNHC(r.Recorder, mdr)
-		_, err = r.updateConditions(remediationTimedOutByNhc, mdr)
+		updateRequired, err := r.updateConditions(remediationTimedOutByNhc, mdr)
+		if err == nil && updateRequired {
+			log.Info("NHC time out annotation found, stopping remediation")
+			commonevents.RemediationStoppedByNHC(r.Recorder, mdr)
+		} else {
+			// Status.Condition and event already handled, nothing to do
+		}
+		// return error only if updateConditions fails
 		return ctrl.Result{}, err
 	}
 

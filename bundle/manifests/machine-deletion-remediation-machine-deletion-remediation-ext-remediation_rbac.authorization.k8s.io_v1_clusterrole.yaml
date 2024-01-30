@@ -12,6 +12,8 @@ rules:
   - machinedeletionremediationtemplates
   verbs:
   - get
+  - list
+  - watch
 - apiGroups:
   - machine-deletion-remediation.medik8s.io
   resources:

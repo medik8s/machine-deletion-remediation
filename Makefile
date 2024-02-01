@@ -157,7 +157,7 @@ fix-imports: sort-imports ## Sort imports
 	$(SORT_IMPORTS) -w .
 
 .PHONY: verify-no-changes
-verify-no-changes: ## verify no there are no un-staged changes
+verify-no-changes: bundle-reset ## verify no there are no un-staged changes and remove unwanted changes to bundle
 	./hack/verify-diff.sh
 
 # Run tests
@@ -304,6 +304,14 @@ bundle-update: verify-previous-version ## Update CSV fields and validate the bun
 	sed -r -i "s|base64data:.*|base64data: ${ICON_BASE64}|;" ${CSV}
 	sed -r -i "s|replaces: .*|replaces: machine-deletion-remediation.v${REPLACES_VERSION}|;" ${CSV}
 	$(MAKE) bundle-validate
+
+.PHONY: bundle-reset
+bundle-reset: ## Revert all version or build date related changes
+	VERSION=${DEFAULT_VERSION} IMG=$(IMAGE_TAG_BASE)-operator:latest; $(MAKE) manifests bundle
+	sed -r -i "s|containerImage: .*|containerImage: \"\"|;" ${CSV}
+	sed -r -i "s|createdAt: .*|createdAt: \"\"|;" ${CSV}
+	sed -r -i "s|base64data:.*|base64data: base64EncodedIcon|;" ${CSV}
+	sed -r -i "s|replaces: .*|replaces: machine-deletion-remediation.v${DEFAULT_VERSION}|;" ${CSV}
 
 .PHONY: verify-previous-version
 verify-previous-version: ## Verifies that PREVIOUS_VERSION variable is set

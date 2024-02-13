@@ -16,8 +16,8 @@ permissions:
   contents: write
 
 jobs:
-  make_okd_bundle:
-    name: Build and commit PR for bundle in OKD
+  make_rh_community_bundle:
+    name: Build and commit PR for bundle in Red Hat Community
     runs-on: ubuntu-22.04
     env:
       PROJECT: ${{ github.repository }}
@@ -46,11 +46,11 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: 'redhat-openshift-ecosystem/community-operators-prod'
-          path: okd
+          path: rhcommunity
           token: ${{ secrets.RH_COMMUNITY_OPERATORS_TOKEN }}
           fetch-depth: 0
 
-      - name: Build OKD Community bundle
+      - name: Build Red Hat Community bundle
         run: |
           export VERSION=${VERSION} 
           export PREVIOUS_VERSION=${PREVIOUS_VERSION}
@@ -59,17 +59,17 @@ jobs:
 
       - name: Copy bundle
         run: |
-          mkdir -p okd/operators/${PROJECT}/${VERSION}
-          cp -vr operator/bundle/* okd/operators/${PROJECT}/${VERSION}
+          mkdir -p rhcommunity/operators/${PROJECT}/${VERSION}
+          cp -vr operator/bundle/* rhcommunity/operators/${PROJECT}/${VERSION}
 
       - name: Commit and push
         run: |
-          git -C okd remote add fork https://github.com/medik8s/community-operators-prod.git
+          git -C rhcommunity remote add fork https://github.com/medik8s/community-operators-prod.git
           BRANCH=add-${PROJECT}-${VERSION}
-          git -C okd config --global user.name "Medik8s Team"
-          git -C okd config --global user.email "medik8s@googlegroups.com"
-          git -C okd add operators/${PROJECT}/${VERSION}
-          git -C okd switch --create ${BRANCH}
-          git -C okd status
-          git -C okd commit -m "Add ${PROJECT}-${VERSION}"
-          git -C okd push --set-upstream fork ${BRANCH}
+          git -C rhcommunity config --global user.name "Medik8s Team"
+          git -C rhcommunity config --global user.email "medik8s@googlegroups.com"
+          git -C rhcommunity add operators/${PROJECT}/${VERSION}
+          git -C rhcommunity switch --create ${BRANCH}
+          git -C rhcommunity status
+          git -C rhcommunity commit -m "Add ${PROJECT}-${VERSION}"
+          git -C rhcommunity push --set-upstream fork ${BRANCH}

@@ -1,0 +1,75 @@
+name: Release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "The version to release, without the leading `v`"
+        required: true
+      previous_version:
+        description: "The previous version, used for the CVS's `replaces` field, without the leading `v`"
+        required: true
+      skip_range_lower:
+        description: "Lower bound for the skipRange field in the CSV, should be set to the oldest supported version, without the leading `v`"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  make_rh_community_bundle:
+    name: Build and commit PR for bundle in Red Hat Community
+    runs-on: ubuntu-22.04
+    env:
+      PROJECT: ${{ github.repository }}
+      VERSION: ${{ inputs.version }}
+      PREVIOUS_VERSION: ${{ inputs.previous_version }}
+      SKIP_RANGE_LOWER: ${{ inputs.skip_range_lower }}
+    steps:
+      - name: Log inputs
+        run: |
+          echo "Building version: ${VERSION}"
+          echo "which replaces version: ${PREVIOUS_VERSION}"
+          echo "Lower skip range bound: ${SKIP_RANGE_LOWER}"
+
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          path: operator
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: operator/go.mod
+
+      - name: Checkout Community operators
+        uses: actions/checkout@v3
+        with:
+          repository: 'redhat-openshift-ecosystem/community-operators-prod'
+          path: rhcommunity
+          token: ${{ secrets.RH_COMMUNITY_OPERATORS_TOKEN }}
+          fetch-depth: 0
+
+      - name: Build Red Hat Community bundle
+        run: |
+          export VERSION=${VERSION} 
+          export PREVIOUS_VERSION=${PREVIOUS_VERSION}
+          export SKIP_RANGE_LOWER=${SKIP_RANGE_LOWER}
+          rm -r operator/bundle && make -C operator bundle-community
+
+      - name: Copy bundle
+        run: |
+          mkdir -p rhcommunity/operators/${PROJECT}/${VERSION}
+          cp -vr operator/bundle/* rhcommunity/operators/${PROJECT}/${VERSION}
+
+      - name: Commit and push
+        run: |
+          git -C rhcommunity remote add fork https://github.com/medik8s/community-operators-prod.git
+          BRANCH=add-${PROJECT}-${VERSION}
+          git -C rhcommunity config --global user.name "Medik8s Team"
+          git -C rhcommunity config --global user.email "medik8s@googlegroups.com"
+          git -C rhcommunity add operators/${PROJECT}/${VERSION}
+          git -C rhcommunity switch --create ${BRANCH}
+          git -C rhcommunity status
+          git -C rhcommunity commit -m "Add ${PROJECT}-${VERSION}"
+          git -C rhcommunity push --set-upstream fork ${BRANCH}

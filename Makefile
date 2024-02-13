@@ -27,6 +27,9 @@ GOIMPORTS_VERSION ?= v0.17.0
 # Sort-imports versions at https://github.com/slintes/sort-imports/releases
 SORT_IMPORTS_VERSION = v0.2.1
 
+# OCP Version: for OKD bundle community
+OCP_VERSION = 4.12
+
 # VERSION defines the project version for the bundle. 
 # Update this value when you upgrade the version of your project.
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
@@ -321,8 +324,9 @@ verify-previous-version: ## Verifies that PREVIOUS_VERSION variable is set
     fi
 
 .PHONY: bundle-community
-bundle-community: ## Update displayName field in the bundle's CSV
+bundle-community: bundle ## Update displayName field in the bundle's CSV
 	sed -r -i "s|displayName: Machine Deletion Remediation operator.*|displayName: Machine Deletion Remediation Operator - Community Edition|;" ${CSV}
+	echo -e "\n  # Annotations for OCP\n  com.redhat.openshift.versions: \"v${OCP_VERSION}\"" >> bundle/metadata/annotations.yaml
 	$(MAKE) bundle-update
 
 .PHONY: bundle-validate

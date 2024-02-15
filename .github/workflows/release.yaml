@@ -55,6 +55,7 @@ jobs:
           export VERSION=${VERSION} 
           export PREVIOUS_VERSION=${PREVIOUS_VERSION}
           export SKIP_RANGE_LOWER=${SKIP_RANGE_LOWER}
+          git -C operator checkout v${VERSION}
           rm -r operator/bundle && make -C operator bundle-community
 
       - name: Copy bundle

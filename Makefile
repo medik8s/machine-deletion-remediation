@@ -37,7 +37,7 @@ OCP_VERSION = 4.12
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 DEFAULT_VERSION := 0.0.1
 VERSION ?= $(DEFAULT_VERSION)
-REPLACES_VERSION ?= $(VERSION)
+PREVIOUS_VERSION ?= $(VERSION)
 export VERSION
 
 # CHANNELS define the bundle channels used in the bundle.
@@ -302,7 +302,7 @@ bundle-update: verify-previous-version ## Update CSV fields and validate the bun
 	sed -r -i "s|containerImage: .*|containerImage: $(IMG)|;" ${CSV}
 	sed -r -i "s|createdAt: .*|createdAt: \"`date '+%Y-%m-%d %T'`\"|;" ${CSV}
 	sed -r -i "s|base64data:.*|base64data: ${ICON_BASE64}|;" ${CSV}
-	sed -r -i "s|replaces: .*|replaces: machine-deletion-remediation.v${REPLACES_VERSION}|;" ${CSV}
+	sed -r -i "s|replaces: .*|replaces: machine-deletion-remediation.v${PREVIOUS_VERSION}|;" ${CSV}
 	$(MAKE) bundle-validate
 
 .PHONY: bundle-reset

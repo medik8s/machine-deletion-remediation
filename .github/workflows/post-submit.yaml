@@ -62,7 +62,6 @@ jobs:
 
             * Operator: quay.io/medik8s/machine-deletion-remediation-operator:${{ github.ref_name }}
             * Bundle: quay.io/medik8s/machine-deletion-remediation-operator-bundle:${{ github.ref_name }}
-            * Catalog aka Index: quay.io/medik8s/machine-deletion-remediation-operator-catalog:${{ github.ref_name }}
             
             ### Source code and OLM manifests
 

@@ -34,7 +34,7 @@ SORT_IMPORTS_VERSION = v0.2.1
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 DEFAULT_VERSION := 0.0.1
 VERSION ?= $(DEFAULT_VERSION)
-REPLACES_VERSION ?= $(VERSION)
+PREVIOUS_VERSION ?= $(DEFAULT_VERSION)
 export VERSION
 
 # CHANNELS define the bundle channels used in the bundle.
@@ -307,7 +307,8 @@ bundle-update: verify-previous-version ## Update CSV fields and validate the bun
 
 .PHONY: verify-previous-version
 verify-previous-version: ## Verifies that PREVIOUS_VERSION variable is set
-	@if [ $(VERSION) != $(DEFAULT_VERSION) ] && [ $(PREVIOUS_VERSION) = $(DEFAULT_VERSION) ]; then \
+	@if [ $(VERSION) != $(DEFAULT_VERSION) ] && \
+		[ $(PREVIOUS_VERSION) == $(DEFAULT_VERSION) ]; then \
   			echo "Error: PREVIOUS_VERSION must be set for the selected VERSION"; \
     		exit 1; \
     fi

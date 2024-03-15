@@ -59,8 +59,8 @@ const (
 	noMachineAnnotationError           = "failed to find openshift machine annotation on node name: %s"
 	invalidValueMachineAnnotationError = "failed to extract Machine Name and Machine Namespace from machine annotation on the node for node name: %s"
 	failedToDeleteMachineError         = "failed to delete machine of node name: %s"
-	nodeNotFoundErrorMsg               = "failed to fetch node"
-	machineNotFoundErrorMsg            = "failed to fetch machine of node"
+	nodeNotFoundErrorMsg               = "could not get the node"
+	machineNotFoundErrorMsg            = "could not get node's machine"
 	noControllerOwnerErrorMsg          = "ignoring remediation of the machine: the machine has no controller owner"
 	// Cluster Provider messages
 	machineDeletedOnCloudProviderMessage     = "Machine will be deleted and the unhealthy node replaced. This is a Cloud cluster provider: the new node is expected to have a new name"
@@ -71,13 +71,13 @@ const (
 type conditionChangeReason string
 
 const (
-	remediationStarted                  conditionChangeReason = "RemediationStarted"
-	remediationTimedOutByNhc            conditionChangeReason = "RemediationStoppedByNHC"
-	remediationFinishedMachineDeleted   conditionChangeReason = "MachineDeleted"
-	remediationSkippedNodeNotFound      conditionChangeReason = "RemediationSkippedNodeNotFound"
-	remediationSkippedMachineNotFound   conditionChangeReason = "RemediationSkippedMachineNotFound"
-	remediationSkippedNoControllerOwner conditionChangeReason = "RemediationSkippedNoControllerOwner"
-	remediationFailed                   conditionChangeReason = "RemediationFailed"
+	remediationStarted                      conditionChangeReason = "RemediationStarted"
+	remediationTimedOutByNhc                conditionChangeReason = "RemediationStoppedByNHC"
+	remediationFinishedMachineDeleted       conditionChangeReason = "MachineDeleted"
+	remediationCannotStartNodeNotFound      conditionChangeReason = "RemediationCannotStartNodeNotFound"
+	remediationCannotStartMachineNotFound   conditionChangeReason = "RemediationCannotStartMachineNotFound"
+	remediationCannotStartNoControllerOwner conditionChangeReason = "RemediationCannotStartNoControllerOwner"
+	remediationFailed                       conditionChangeReason = "RemediationFailed"
 )
 
 var (
@@ -156,11 +156,11 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 		// situation. An error is returned only if it does not match the following custom errors, or
 		// updateConditions fails.
 		if err == nodeNotFoundError {
-			commonevents.WarningEvent(r.Recorder, mdr, string(remediationSkippedNodeNotFound), nodeNotFoundErrorMsg)
-			_, err = r.updateConditions(remediationSkippedNodeNotFound, mdr)
+			commonevents.GetTargetNodeFailed(r.Recorder, mdr)
+			_, err = r.updateConditions(remediationCannotStartNodeNotFound, mdr)
 		} else if err == machineNotFoundError {
-			commonevents.WarningEvent(r.Recorder, mdr, string(remediationSkippedMachineNotFound), machineNotFoundErrorMsg)
-			_, err = r.updateConditions(remediationSkippedMachineNotFound, mdr)
+			commonevents.WarningEvent(r.Recorder, mdr, string(remediationCannotStartMachineNotFound), machineNotFoundErrorMsg)
+			_, err = r.updateConditions(remediationCannotStartMachineNotFound, mdr)
 		} else if err == unrecoverableError {
 			commonevents.WarningEvent(r.Recorder, mdr, string(remediationFailed), unrecoverableError.Error())
 			_, err = r.updateConditions(remediationFailed, mdr)
@@ -233,8 +233,8 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 
 	if !hasControllerOwner(machine) {
 		log.Info(noControllerOwnerErrorMsg, "machine", machine.GetName(), "remediation name", mdr.Name)
-		commonevents.WarningEvent(r.Recorder, mdr, string(remediationSkippedNoControllerOwner), noControllerOwnerErrorMsg)
-		_, err = r.updateConditions(remediationSkippedNoControllerOwner, mdr)
+		commonevents.WarningEvent(r.Recorder, mdr, string(remediationCannotStartNoControllerOwner), noControllerOwnerErrorMsg)
+		_, err = r.updateConditions(remediationCannotStartNoControllerOwner, mdr)
 		return ctrl.Result{}, err
 	}
 
@@ -418,9 +418,9 @@ func (r *MachineDeletionRemediationReconciler) updateConditions(reason condition
 		processingConditionStatus = metav1.ConditionFalse
 		succeededConditionStatus = metav1.ConditionTrue
 	case remediationTimedOutByNhc,
-		remediationSkippedNoControllerOwner,
-		remediationSkippedNodeNotFound,
-		remediationSkippedMachineNotFound,
+		remediationCannotStartNoControllerOwner,
+		remediationCannotStartNodeNotFound,
+		remediationCannotStartMachineNotFound,
 		remediationFailed:
 		processingConditionStatus = metav1.ConditionFalse
 		succeededConditionStatus = metav1.ConditionFalse

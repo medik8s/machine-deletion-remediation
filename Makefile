@@ -30,6 +30,10 @@ SORT_IMPORTS_VERSION = v0.2.1
 # OCP Version: for OKD bundle community
 OCP_VERSION = 4.12
 
+# update for major version updates to YQ_VERSION! see https://github.com/mikefarah/yq
+YQ_API_VERSION = v4
+YQ_VERSION = v4.44.2
+
 BLUE_ICON_PATH = "./config/assets/medik8s_blue_icon.png"
 
 # VERSION defines the project version for the bundle. 
@@ -253,6 +257,11 @@ SORT_IMPORTS = $(LOCALBIN)/sort-imports
 sort-imports: ## Download sort-imports locally if necessary.
 	$(call go-install-tool,$(SORT_IMPORTS),github.com/slintes/sort-imports@$(SORT_IMPORTS_VERSION))
 
+.PHONY: yq
+YQ = $(LOCALBIN)/yq
+yq: ## Download yq locally if necessary.
+	@$(call go-install-tool,$(YQ),github.com/mikefarah/yq/$(YQ_API_VERSION)@$(YQ_VERSION))
+
 # go-install-tool will 'go install' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 define go-install-tool
@@ -329,8 +338,23 @@ verify-previous-version: ## Verifies that PREVIOUS_VERSION variable is set
 .PHONY: bundle-community-rh
 bundle-community-rh: bundle ## Update displayName field in the bundle's CSV
 	sed -r -i "s|displayName: Machine Deletion Remediation operator.*|displayName: Machine Deletion Remediation Operator - Community Edition|;" ${CSV}
+	$(MAKE) add-ocp-annotations
 	echo -e "\n  # Annotations for OCP\n  com.redhat.openshift.versions: \"v${OCP_VERSION}\"" >> bundle/metadata/annotations.yaml
 	$(MAKE) bundle-update
+
+
+.PHONY: add-ocp-annotations
+add-ocp-annotations: yq ## Add OCP annotations
+	$(YQ) -i '.metadata.annotations."operators.openshift.io/valid-subscription" = "[\"OpenShift Kubernetes Engine\", \"OpenShift Container Platform\", \"OpenShift Platform Plus\"]"' ${CSV}
+	# new infrastructure annotations see https://docs.engineering.redhat.com/display/CFC/Best_Practices#Best_Practices-(New)RequiredInfrastructureAnnotations
+	$(YQ) -i '.metadata.annotations."features.operators.openshift.io/disconnected" = "true"' ${CSV}
+	$(YQ) -i '.metadata.annotations."features.operators.openshift.io/fips-compliant" = "false"' ${CSV}
+	$(YQ) -i '.metadata.annotations."features.operators.openshift.io/proxy-aware" = "false"' ${CSV}
+	$(YQ) -i '.metadata.annotations."features.operators.openshift.io/tls-profiles" = "false"' ${CSV}
+	$(YQ) -i '.metadata.annotations."features.operators.openshift.io/token-auth-aws" = "false"' ${CSV}
+	$(YQ) -i '.metadata.annotations."features.operators.openshift.io/token-auth-azure" = "false"' ${CSV}
+	$(YQ) -i '.metadata.annotations."features.operators.openshift.io/token-auth-gcp" = "false"' ${CSV}
+
 
 .PHONY: bundle-validate
 bundle-validate: operator-sdk ## Validate the bundle directory with additional validators (suite=operatorframework), such as Kubernetes deprecated APIs (https://kubernetes.io/docs/reference/using-api/deprecation-guide/) based on bundle.CSV.Spec.MinKubeVersion

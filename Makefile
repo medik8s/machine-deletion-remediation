@@ -326,8 +326,8 @@ verify-previous-version: ## Verifies that PREVIOUS_VERSION variable is set
     		exit 1; \
     fi
 
-.PHONY: bundle-community-rh
-bundle-community-rh: bundle ## Update displayName field in the bundle's CSV
+.PHONY: bundle-community-okd
+bundle-community-okd: bundle ## Update displayName field in the bundle's CSV
 	sed -r -i "s|displayName: Machine Deletion Remediation operator.*|displayName: Machine Deletion Remediation Operator - Community Edition|;" ${CSV}
 	echo -e "\n  # Annotations for OCP\n  com.redhat.openshift.versions: \"v${OCP_VERSION}\"" >> bundle/metadata/annotations.yaml
 	$(MAKE) bundle-update

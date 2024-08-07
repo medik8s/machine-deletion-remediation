@@ -27,9 +27,6 @@ GOIMPORTS_VERSION ?= v0.17.0
 # Sort-imports versions at https://github.com/slintes/sort-imports/releases
 SORT_IMPORTS_VERSION = v0.2.1
 
-# OCP Version: for OKD bundle community
-OCP_VERSION = 4.12
-
 BLUE_ICON_PATH = "./config/assets/medik8s_blue_icon.png"
 
 # VERSION defines the project version for the bundle. 

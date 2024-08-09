@@ -27,13 +27,11 @@ GOIMPORTS_VERSION ?= v0.17.0
 # Sort-imports versions at https://github.com/slintes/sort-imports/releases
 SORT_IMPORTS_VERSION = v0.2.1
 
-# OCP Version: for OKD bundle community
-OCP_VERSION = 4.12
-
 # update for major version updates to YQ_VERSION! see https://github.com/mikefarah/yq
 YQ_API_VERSION = v4
 YQ_VERSION = v4.44.2
 
+BLUE_ICON_PATH = "./config/assets/medik8s_blue_icon.png"
 # VERSION defines the project version for the bundle. 
 # Update this value when you upgrade the version of your project.
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
@@ -69,7 +67,7 @@ BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
 endif
 BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 
-# IMAGE_REGISTRY used to indicate the registery/group for the operator, bundle and catalog
+# IMAGE_REGISTRY used to indicate the registery/group for the operator and bundle
 IMAGE_REGISTRY ?= quay.io/medik8s
 export IMAGE_REGISTRY
 
@@ -82,9 +80,9 @@ endif
 export IMAGE_TAG
 
 # IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
-# This variable is used to construct full image tags for bundle and catalog images.
+# This variable is used to construct full image tags for bundle images.
 #
-# For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
+# For example, running 'make bundle-build bundle-push' will build and push the bundle image
 # medik8s/machine-deletion-remediation-bundle:$(IMAGE_TAG) and medik8s/machine-deletion-remediation-catalog:$(IMAGE_TAG).
 IMAGE_TAG_BASE ?= $(IMAGE_REGISTRY)/$(OPERATOR_NAME)
 
@@ -164,7 +162,7 @@ fix-imports: sort-imports ## Sort imports
 	$(SORT_IMPORTS) -w .
 
 .PHONY: verify-no-changes
-verify-no-changes: ## verify no there are no un-staged changes
+verify-no-changes: bundle-reset ## verify no there are no un-staged changes and remove unwanted changes to bundle
 	./hack/verify-diff.sh
 
 # Run tests
@@ -305,7 +303,7 @@ bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metada
 	$(MAKE) bundle-validate
 
 ## Some addition to bundle creation in the bundle
-DEFAULT_ICON_BASE64 := $(shell base64 --wrap=0 ./config/assets/medik8s_blue_icon.png)
+DEFAULT_ICON_BASE64 := $(shell base64 --wrap=0 ${BLUE_ICON_PATH})
 export ICON_BASE64 ?= ${DEFAULT_ICON_BASE64}
 export CSV="./bundle/manifests/$(OPERATOR_NAME).clusterserviceversion.yaml"
 
@@ -317,6 +315,14 @@ bundle-update: verify-previous-version ## Update CSV fields and validate the bun
 	sed -r -i "s|replaces: .*|replaces: machine-deletion-remediation.v${PREVIOUS_VERSION}|;" ${CSV}
 	$(MAKE) bundle-validate
 
+.PHONY: bundle-reset
+bundle-reset: ## Revert all version or build date related changes
+	VERSION=${DEFAULT_VERSION} IMG=$(IMAGE_TAG_BASE)-operator:latest; $(MAKE) manifests bundle
+	sed -r -i "s|containerImage: .*|containerImage: \"\"|;" ${CSV}
+	sed -r -i "s|createdAt: .*|createdAt: \"\"|;" ${CSV}
+	sed -r -i "s|base64data:.*|base64data: base64EncodedIcon|;" ${CSV}
+	sed -r -i "s|replaces: .*|replaces: machine-deletion-remediation.v${DEFAULT_VERSION}|;" ${CSV}
+
 .PHONY: verify-previous-version
 verify-previous-version: ## Verifies that PREVIOUS_VERSION variable is set
 	@if [ $(VERSION) != $(DEFAULT_VERSION) ] && \
@@ -325,8 +331,8 @@ verify-previous-version: ## Verifies that PREVIOUS_VERSION variable is set
     		exit 1; \
     fi
 
-.PHONY: bundle-community
-bundle-community: ## Update displayName field in the bundle's CSV
+.PHONY: bundle-community-okd
+bundle-community-okd: bundle ## Update displayName field in the bundle's CSV
 	sed -r -i "s|displayName: Machine Deletion Remediation operator.*|displayName: Machine Deletion Remediation Operator - Community Edition|;" ${CSV}
 	$(MAKE) add-ocp-annotations
 	echo -e "\n  # Annotations for OCP\n  com.redhat.openshift.versions: \"v${OCP_VERSION}\"" >> bundle/metadata/annotations.yaml
@@ -367,22 +373,40 @@ bundle-run: operator-sdk ## Run bundle image
 bundle-cleanup: operator-sdk ## Remove bundle installed via bundle-run
 	$(OPERATOR_SDK) -n $(BUNDLE_RUN_NAMESPACE) cleanup $(OPERATOR_NAME)
 
+# Build a file-based catalog image
+# https://docs.openshift.com/container-platform/4.14/operators/admin/olm-managing-custom-catalogs.html#olm-managing-custom-catalogs-fb
+# NOTE: CATALOG_DIR and CATALOG_DOCKERFILE items won't be deleted in case of recipe's failure
+CATALOG_DIR := catalog
+CATALOG_DOCKERFILE := ${CATALOG_DIR}.Dockerfile
+CATALOG_INDEX := $(CATALOG_DIR)/index.yaml
 
-# A comma-separated list of bundle images (e.g. make catalog-build BUNDLE_IMGS=example.com/operator-bundle:v0.1.0,example.com/operator-bundle:v0.2.0).
-# These images MUST exist in a registry and be pull-able.
-BUNDLE_IMGS ?= $(BUNDLE_IMG)
+.PHONY: add_channel_entry_for_the_bundle
+add_channel_entry_for_the_bundle:
+	@echo "---" >> ${CATALOG_INDEX}
+	@echo "schema: olm.channel" >> ${CATALOG_INDEX}
+	@echo "package: ${OPERATOR_NAME}" >> ${CATALOG_INDEX}
+	@echo "name: ${CHANNELS}" >> ${CATALOG_INDEX}
+	@echo "entries:" >> ${CATALOG_INDEX}
+	@echo "  - name: ${OPERATOR_NAME}.v${VERSION}" >> ${CATALOG_INDEX}
 
-# Set CATALOG_BASE_IMG to an existing catalog image tag to add $BUNDLE_IMGS to that image.
-ifneq ($(origin CATALOG_BASE_IMG), undefined)
-FROM_INDEX_OPT := --from-index $(CATALOG_BASE_IMG)
-endif
-
-# Build a catalog image by adding bundle images to an empty catalog using the operator package manager tool, 'opm'.
-# This recipe invokes 'opm' in 'semver' bundle add mode. For more information on add modes, see:
-# https://github.com/operator-framework/community-operators/blob/7f1438c/docs/packaging-operator.md#updating-your-existing-operator
 .PHONY: catalog-build
-catalog-build: opm ## Build a catalog image.
-	$(OPM) index add --container-tool docker --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT)
+catalog-build: opm ## Build a file-based catalog image.
+	# Remove the catalog directory and Dockerfile if they exist
+	-rm -r ${CATALOG_DIR} ${CATALOG_DOCKERFILE}
+	@mkdir -p ${CATALOG_DIR}
+	$(OPM) generate dockerfile ${CATALOG_DIR}
+	$(OPM) init ${OPERATOR_NAME} \
+		--default-channel=${CHANNELS} \
+		--description=./README.md \
+		--icon=${BLUE_ICON_PATH} \
+		--output yaml \
+		> ${CATALOG_INDEX}
+	$(OPM) render ${BUNDLE_IMG} --output yaml >> ${CATALOG_INDEX}
+	$(MAKE) add_channel_entry_for_the_bundle
+	$(OPM) validate ${CATALOG_DIR}
+	docker build . -f ${CATALOG_DOCKERFILE} -t ${CATALOG_IMG}
+	# Clean up the catalog directory and Dockerfile
+	rm -r ${CATALOG_DIR} ${CATALOG_DOCKERFILE}
 
 .PHONY: catalog-push
 catalog-push: ## Push a catalog image.
@@ -392,8 +416,8 @@ catalog-push: ## Push a catalog image.
 
 .PHONY: container-build
 container-build: ## Build containers
-	make docker-build bundle-build
+	make docker-build bundle-build catalog-build catalog-push
 
 .PHONY: container-push
-container-push:  ## Push containers (NOTE: catalog can't be build before bundle was pushed)
-	make docker-push bundle-push catalog-build catalog-push
+container-push:  ## Push containers
+	make docker-push bundle-push

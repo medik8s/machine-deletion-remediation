@@ -31,6 +31,7 @@ SORT_IMPORTS_VERSION = v0.2.1
 YQ_API_VERSION = v4
 YQ_VERSION = v4.44.2
 
+BLUE_ICON_PATH = "./config/assets/medik8s_blue_icon.png"
 # VERSION defines the project version for the bundle. 
 # Update this value when you upgrade the version of your project.
 # To re-generate a bundle for another specific version without changing the standard setup, you can:

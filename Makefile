@@ -173,7 +173,7 @@ export TEST_OPS ?= ""
 test: test-no-verify-changes verify-no-changes ## Run tests and verify no changes
 
 .PHONY: test-no-verify-changes
-test-no-verify-changes: manifests generate go-verify fmt vet test-imports envtest ## Generate and format code, run tests, generate manifests and bundle
+test-no-verify-changes: go-verify manifests generate fmt vet test-imports envtest ## Generate and format code, run tests, generate manifests and bundle
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path  --bin-dir $(PROJECT_DIR)/testbin)" \
 	go test ./controllers/... -coverprofile cover.out ${TEST_OPS}
 

@@ -1,11 +1,11 @@
 module github.com/medik8s/machine-deletion-remediation
 
-go 1.21
+go 1.23
 
 require (
 	github.com/go-logr/logr v1.4.1
-	github.com/medik8s/common v1.13.0
-	github.com/onsi/ginkgo/v2 v2.15.0
+	github.com/medik8s/common v1.17.0
+	github.com/onsi/ginkgo/v2 v2.22.0
 	github.com/onsi/gomega v1.31.1
 	github.com/openshift/api v0.0.0-20240124164020-e2ce40831f2e // release-4.16
 	github.com/pkg/errors v0.9.1

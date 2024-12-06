@@ -143,11 +143,11 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					verifyMachineNotDeleted(workerNodeMachineName)
 					verifyMachineNotDeleted(masterNodeMachineName)
 					verifyConditionsMatch([]expectedCondition{
-						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationSkippedNodeNotFound},
-						{commonconditions.SucceededType, metav1.ConditionFalse, remediationSkippedNodeNotFound}})
+						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationCannotStartNodeNotFound},
+						{commonconditions.SucceededType, metav1.ConditionFalse, remediationCannotStartNodeNotFound}})
 					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
 					verifyEvents([]expectedEvent{
-						{v1.EventTypeWarning, "RemediationSkippedNodeNotFound", "failed to fetch node", true},
+						{v1.EventTypeWarning, "RemediationCannotStart", "Could not get remediation target Node", true},
 						{v1.EventTypeNormal, "RemediationStarted", "Remediation started", false},
 					})
 				})
@@ -162,12 +162,12 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					verifyMachineNotDeleted(workerNodeMachineName)
 					verifyMachineNotDeleted(masterNodeMachineName)
 					verifyConditionsMatch([]expectedCondition{
-						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationSkippedNoControllerOwner},
-						{commonconditions.SucceededType, metav1.ConditionFalse, remediationSkippedNoControllerOwner},
+						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationCannotStartNoControllerOwner},
+						{commonconditions.SucceededType, metav1.ConditionFalse, remediationCannotStartNoControllerOwner},
 						// Cluster provider is not set in this test
 						{commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason}})
 					verifyEvents([]expectedEvent{
-						{v1.EventTypeWarning, "RemediationSkippedNoControllerOwner", noControllerOwnerErrorMsg, true},
+						{v1.EventTypeWarning, string(remediationCannotStartNoControllerOwner), noControllerOwnerErrorMsg, true},
 						{v1.EventTypeNormal, "RemediationStarted", "Remediation started", false},
 					})
 				})
@@ -184,12 +184,12 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					verifyMachineNotDeleted(workerNodeMachineName)
 					verifyMachineNotDeleted(masterNodeMachineName)
 					verifyConditionsMatch([]expectedCondition{
-						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationSkippedNoControllerOwner},
-						{commonconditions.SucceededType, metav1.ConditionFalse, remediationSkippedNoControllerOwner},
+						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationCannotStartNoControllerOwner},
+						{commonconditions.SucceededType, metav1.ConditionFalse, remediationCannotStartNoControllerOwner},
 						// Cluster provider is not set in this test
 						{commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason}})
 					verifyEvents([]expectedEvent{
-						{v1.EventTypeWarning, "RemediationSkippedNoControllerOwner", noControllerOwnerErrorMsg, true},
+						{v1.EventTypeWarning, "RemediationCannotStartNoControllerOwner", noControllerOwnerErrorMsg, true},
 						{v1.EventTypeNormal, "RemediationStarted", "Remediation started", false},
 					})
 				})
@@ -207,13 +207,13 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					verifyMachineNotDeleted(workerNodeMachineName)
 					verifyMachineNotDeleted(masterNodeMachineName)
 					verifyConditionsMatch([]expectedCondition{
-						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationSkippedNoControllerOwner},
-						{commonconditions.SucceededType, metav1.ConditionFalse, remediationSkippedNoControllerOwner},
+						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationCannotStartNoControllerOwner},
+						{commonconditions.SucceededType, metav1.ConditionFalse, remediationCannotStartNoControllerOwner},
 						// Cluster provider is not set in this test
 						{commonconditions.PermanentNodeDeletionExpectedType, metav1.ConditionUnknown, v1alpha1.MachineDeletionOnUndefinedProviderReason}})
 
 					verifyEvents([]expectedEvent{
-						{v1.EventTypeWarning, "RemediationSkippedNoControllerOwner", noControllerOwnerErrorMsg, true},
+						{v1.EventTypeWarning, "RemediationCannotStartNoControllerOwner", noControllerOwnerErrorMsg, true},
 						{v1.EventTypeNormal, "RemediationStarted", "Remediation started", false},
 					})
 				})
@@ -366,11 +366,11 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					}, 30*time.Second, 1*time.Second).Should(BeTrue())
 
 					verifyConditionsMatch([]expectedCondition{
-						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationSkippedNodeNotFound},
-						{commonconditions.SucceededType, metav1.ConditionFalse, remediationSkippedNodeNotFound}})
+						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationCannotStartNodeNotFound},
+						{commonconditions.SucceededType, metav1.ConditionFalse, remediationCannotStartNodeNotFound}})
 					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
 					verifyEvents([]expectedEvent{
-						{v1.EventTypeWarning, "RemediationSkippedNodeNotFound", "failed to fetch node", true},
+						{v1.EventTypeWarning, "RemediationCannotStart", "Could not get remediation target Node", true},
 						{v1.EventTypeNormal, "RemediationStarted", "Remediation started", false},
 					})
 				})
@@ -452,17 +452,17 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					Expect(k8sClient.Update(context.Background(), masterNode)).ToNot(HaveOccurred())
 				})
 
-				It("failed to fetch machine error", func() {
+				It("failed to get machine error", func() {
 					Eventually(func() bool {
 						return plogs.Contains(machineNotFoundErrorMsg)
 					}, 30*time.Second, 1*time.Second).Should(BeTrue())
 
 					verifyConditionsMatch([]expectedCondition{
-						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationSkippedMachineNotFound},
-						{commonconditions.SucceededType, metav1.ConditionFalse, remediationSkippedMachineNotFound}})
+						{commonconditions.ProcessingType, metav1.ConditionFalse, remediationCannotStartMachineNotFound},
+						{commonconditions.SucceededType, metav1.ConditionFalse, remediationCannotStartMachineNotFound}})
 					verifyConditionUnset(commonconditions.PermanentNodeDeletionExpectedType)
 					verifyEvents([]expectedEvent{
-						{v1.EventTypeWarning, "RemediationSkippedMachineNotFound", "failed to fetch machine of node", true},
+						{v1.EventTypeWarning, "RemediationCannotStartMachineNotFound", "could not get node's machine", true},
 						{v1.EventTypeNormal, "RemediationStarted", "Remediation started", false},
 					})
 				})

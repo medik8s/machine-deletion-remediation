@@ -10,7 +10,7 @@ COPY go.sum go.sum
 
 RUN \
     # get Go version from mod file
-    export GO_VERSION=$(grep -E "go [[:digit:]]\.[[:digit:]][[:digit:]]" go.mod | awk '{print $2}') && \
+    export GO_VERSION=$(grep -oE "go [[:digit:]]\.[[:digit:]][[:digit:]]" go.mod | awk '{print $2}') && \
     echo ${GO_VERSION} && \
     # find filename for latest z version from Go download page
     export GO_FILENAME=$(curl -sL 'https://go.dev/dl/?mode=json&include=all' | jq -r "[.[] | select(.version | startswith(\"go${GO_VERSION}\"))][0].files[] | select(.os == \"linux\" and .arch == \"amd64\") | .filename") && \
@@ -36,7 +36,7 @@ COPY version/ version/
 # Build
 RUN ./hack/build.sh .
 
-# Use ubi8 micro as base image to package the manager binary
+# Use ubi9 micro as base image to package the manager binary
 FROM registry.access.redhat.com/ubi9/ubi-micro:latest
 WORKDIR /
 COPY --from=builder /workspace/manager .

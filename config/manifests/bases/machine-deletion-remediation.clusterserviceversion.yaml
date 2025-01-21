@@ -62,8 +62,8 @@ spec:
     Machine once deleted, and then proceeds with deleting the Machine.
 
     # How to use MDR with NHC
-    Since NHC comes with Self Node Remediation as the default remediation mechanism,
-    it needs to be configured to use MDR with the following steps
+    To use MDR as remediation mechanism for NHC, it needs to be configured with the
+    following steps:
 
     - Create the MDR Template CR
     - Modify NHC's `.spec.remediationTemplate` to use MDR as it's remediator

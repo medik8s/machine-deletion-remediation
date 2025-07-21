@@ -94,11 +94,13 @@ jobs:
     if: ${{ inputs.operation == 'create_okd_release_pr' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Check if ocp_version is provided
-        if: ${{ inputs.ocp_version == '' }}
+      - name: Fail when ocp_version is missing
+        if: ${{ !inputs.ocp_version }}
         run: |
           echo "Error: The 'ocp_version' input is mandatory when the operation is 'create_okd_release_pr'."
           exit 1
+      - name: Validation passed
+        run: echo "ocp_version supplied – validation succeeded."
 
   create_okd_release_pr:
     # This job now depends on the validation job.

@@ -17,8 +17,8 @@ on:
        description: "The previous version, used for the CVS's `replaces` field, without the leading `v`"
        required: true
      ocp_version:
-       description: "The target OCP version for the release (mandatory for create_okd_release_pr option)"
-       required: true
+       description: "The target OCP version for the release (mandatory for 'create_okd_release_pr' operation)"
+       required: false
 
 permissions:
   contents: write
@@ -88,7 +88,23 @@ jobs:
           files: >
             Manifests:bundle/
 
+  # This new job validates the inputs for the 'create_okd_release_pr' operation.
+  validate_pr_inputs:
+    name: Validate Inputs
+    if: ${{ inputs.operation == 'create_okd_release_pr' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail when ocp_version is missing
+        if: ${{ !inputs.ocp_version }}
+        run: |
+          echo "Error: The 'ocp_version' input is mandatory when the operation is 'create_okd_release_pr'."
+          exit 1
+      - name: Validation passed
+        run: echo "ocp_version supplied – validation succeeded."
+
   create_okd_release_pr:
+    # This job now depends on the validation job.
+    needs: validate_pr_inputs
     if: inputs.operation == 'create_okd_release_pr'
     uses: medik8s/.github/.github/workflows/release_community_bundle_parametric.yaml@main
     secrets: inherit

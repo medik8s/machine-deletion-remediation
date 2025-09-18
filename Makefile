@@ -417,8 +417,8 @@ catalog-push: ## Push a catalog image.
 
 .PHONY: container-build
 container-build: ## Build containers
-	make docker-build bundle-build catalog-build catalog-push
+	$(MAKE) docker-build bundle-build
 
 .PHONY: container-push
-container-push:  ## Push containers
-	make docker-push bundle-push
+container-push: ## Push containers (NOTE: catalog can't be built before bundle is pushed)
+	$(MAKE) docker-push bundle-push catalog-build catalog-push

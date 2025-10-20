@@ -8,10 +8,10 @@ OPERATOR_NAME := machine-deletion-remediation
 OPERATOR_SDK_VERSION ?= v1.32.0
 
 # OPM versions at https://github.com/operator-framework/operator-registry/releases
-OPM_VERSION = v1.36.0
+OPM_VERSION = v1.60.0
 
 # CONTROLLER_GEN versions at https://github.com/kubernetes-sigs/controller-tools/releases
-CONTROLLER_GEN_VERSION = v0.14.0
+CONTROLLER_GEN_VERSION = v0.19.0
 
 # KUSTOMIZE versions at https://github.com/kubernetes-sigs/kustomize/releases
 # note: update KUSTOMIZE_VERSION and KUSTOMIZE_API_VERSION accordingly.
@@ -19,17 +19,17 @@ KUSTOMIZE_API_VERSION = v5
 KUSTOMIZE_VERSION = v5.3.0
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.26
+ENVTEST_K8S_VERSION = 1.34
 
 # GoImports versions at https://pkg.go.dev/golang.org/x/tools/cmd/goimports?tab=versions
-GOIMPORTS_VERSION ?= v0.17.0
+GOIMPORTS_VERSION ?= v0.38.0
 
 # Sort-imports versions at https://github.com/slintes/sort-imports/releases
-SORT_IMPORTS_VERSION = v0.2.1
+SORT_IMPORTS_VERSION = v0.3.0
 
 # update for major version updates to YQ_VERSION! see https://github.com/mikefarah/yq
 YQ_API_VERSION = v4
-YQ_VERSION = v4.44.2
+YQ_VERSION = v4.48.1
 
 BLUE_ICON_PATH = "./config/assets/medik8s_blue_icon.png"
 

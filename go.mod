@@ -1,23 +1,23 @@
 module github.com/medik8s/machine-deletion-remediation
 
-go 1.23.0
+go 1.24.4
 
 require (
-	github.com/go-logr/logr v1.4.2
+	github.com/go-logr/logr v1.4.3
 	github.com/medik8s/common v1.17.0
-	github.com/onsi/ginkgo/v2 v2.22.0
-	github.com/onsi/gomega v1.34.2
+	github.com/onsi/ginkgo/v2 v2.26.0
+	github.com/onsi/gomega v1.38.2
 	github.com/openshift/api v0.0.0-20240124164020-e2ce40831f2e // release-4.16
 	github.com/pkg/errors v0.9.1
-	go.uber.org/zap v1.26.0
-	k8s.io/api v0.29.1
-	k8s.io/apimachinery v0.29.1
-	k8s.io/client-go v0.29.1
-	sigs.k8s.io/controller-runtime v0.17.0
-	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20230707165103-87487d3539d7
+	go.uber.org/zap v1.27.0
+	k8s.io/api v0.34.1
+	k8s.io/apimachinery v0.34.1
+	k8s.io/client-go v0.34.1
+	sigs.k8s.io/controller-runtime v0.19.7
+	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20251014055335-88269f391452
 )
 
-require k8s.io/utils v0.0.0-20240102154912-e7106e64919e
+require k8s.io/utils v0.0.0-20250604170112-4c0f3b243397
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect

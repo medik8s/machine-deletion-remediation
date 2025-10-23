@@ -13,11 +13,10 @@ require (
 	k8s.io/api v0.34.1
 	k8s.io/apimachinery v0.34.1
 	k8s.io/client-go v0.34.1
+	k8s.io/utils v0.0.0-20250604170112-4c0f3b243397
 	sigs.k8s.io/controller-runtime v0.19.7
 	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20251014055335-88269f391452
 )
-
-require k8s.io/utils v0.0.0-20250604170112-4c0f3b243397
 
 require (
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect

@@ -18,8 +18,11 @@ CONTROLLER_GEN_VERSION = v0.19.0
 KUSTOMIZE_API_VERSION = v5
 KUSTOMIZE_VERSION = v5.3.0
 
+# https://pkg.go.dev/sigs.k8s.io/controller-runtime/tools/setup-envtest/env?tab=versions
+ENVTEST_VERSION = v0.0.0-20260120065648-aebc15d7c689
+
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.34
+ENVTEST_K8S_VERSION = 1.33
 
 # GoImports versions at https://pkg.go.dev/golang.org/x/tools/cmd/goimports?tab=versions
 GOIMPORTS_VERSION ?= v0.38.0
@@ -174,7 +177,7 @@ test: test-no-verify-changes verify-no-changes ## Run tests and verify no change
 
 .PHONY: test-no-verify-changes
 test-no-verify-changes: go-verify manifests generate fmt vet test-imports envtest ## Generate and format code, run tests, generate manifests and bundle
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path  --bin-dir $(PROJECT_DIR)/testbin)" \
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(PROJECT_DIR)/testbin)" \
 	go test ./controllers/... -coverprofile cover.out ${TEST_OPS}
 
 .PHONY: test-e2e
@@ -242,7 +245,7 @@ kustomize: ## Download kustomize locally if necessary
 .PHONY: envtest
 ENVTEST = $(LOCALBIN)/setup-envtest
 envtest: ## Download envtest-setup locally if necessary.
-	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest)
+	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_VERSION))
 
 .PHONY: goimports
 GOIMPORTS = $(LOCALBIN)/goimports

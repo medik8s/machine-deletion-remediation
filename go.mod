@@ -1,7 +1,7 @@
 module github.com/medik8s/machine-deletion-remediation
 
 // min version, matches k8s 1.33.7
-go 1.25.0
+go 1.24.11
 
 // latest downstream version for security patches
 toolchain go1.25.3

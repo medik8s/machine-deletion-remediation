@@ -54,6 +54,7 @@ const (
 	// Infos
 	postponedMachineDeletionInfo  = "target machine was not deleted yet"
 	successfulMachineDeletionInfo = "target machine correctly deleted"
+	machineHasNoNodeRefInfo       = "machine has no nodeRef"
 	//Errors
 	noAnnotationsError                 = "failed to find machine annotation on node name: %s"
 	noMachineAnnotationError           = "failed to find openshift machine annotation on node name: %s"
@@ -207,7 +208,7 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 			log.Error(err, nodeNotFoundErrorMsg, "node name", machine.Status.NodeRef.Name)
 		}
 	} else {
-		log.Info("machine has no nodeRef")
+		log.Info(machineHasNoNodeRefInfo)
 	}
 
 	// Detect if Node name is expected to change after Machine deletion given

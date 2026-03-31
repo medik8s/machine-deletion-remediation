@@ -200,7 +200,7 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 
 	log.Info("target machine found", "machine", machine.GetName())
 
-	// Check if a node actually exists in the cluster
+	// Check if the node actually exists in the cluster
 	if machine.Status.NodeRef != nil {
 		node := &v1.Node{}
 		nodeKey := client.ObjectKey{Name: machine.Status.NodeRef.Name}

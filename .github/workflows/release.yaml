@@ -118,3 +118,4 @@ jobs:
       ocp_version: ${{ inputs.ocp_version }}
       community: 'OKD'
       make_targets: "bundle-community-okd"
+      checkout_ref: ${{ inputs.checkout_ref }}

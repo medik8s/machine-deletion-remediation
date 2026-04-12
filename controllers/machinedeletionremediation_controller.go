@@ -64,9 +64,9 @@ const (
 	machineNotFoundErrorMsg            = "could not get node's machine"
 	noControllerOwnerErrorMsg          = "ignoring remediation of the machine: the machine has no controller owner"
 	// Cluster Provider messages
-	machineDeletedOnCloudProviderMessage     = "Machine will be deleted for remediation. This is a Cloud cluster provider: the new node is expected to have a new name"
-	machineDeletedOnBareMetalProviderMessage = "Machine will be deleted for remediation. This is a BareMetal cluster provider: the new node is NOT expected to have a new name"
-	machineDeletedOnUnknownProviderMessage   = "Machine will be deleted for remediation. Unknown cluster provider: no information about the new node's name"
+	machineDeletedOnCloudProviderMessage     = "Machine will be deleted as part of remediation. This is a Cloud cluster provider: the new node is expected to have a new name"
+	machineDeletedOnBareMetalProviderMessage = "Machine will be deleted as part of remediation. This is a BareMetal cluster provider: the new node is NOT expected to have a new name"
+	machineDeletedOnUnknownProviderMessage   = "Machine will be deleted as part of remediation. Unknown cluster provider: no information about the new node's name"
 )
 
 type conditionChangeReason string
@@ -200,12 +200,12 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 
 	log.Info("target machine found", "machine", machine.GetName())
 
-	// Check if the node actually exists in the cluster
+	// Verify if the node referenced by the machine can be retrieved
 	if machine.Status.NodeRef != nil {
 		node := &v1.Node{}
 		nodeKey := client.ObjectKey{Name: machine.Status.NodeRef.Name}
 		if err := r.Get(ctx, nodeKey, node); err != nil {
-			log.Error(err, nodeNotFoundErrorMsg, "node name", machine.Status.NodeRef.Name)
+			log.Error(err, "failed to get node", "node name", machine.Status.NodeRef.Name)
 		}
 	} else {
 		log.Info(machineHasNoNodeRefInfo)

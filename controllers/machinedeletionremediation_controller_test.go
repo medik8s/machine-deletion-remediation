@@ -312,7 +312,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					verifyEvents([]expectedEvent{
 						{v1.EventTypeNormal,
 							"PermanentNodeDeletionExpected",
-							"Machine will be deleted for remediation. This is a BareMetal cluster provider: the new node is NOT expected to have a new name",
+							"Machine will be deleted as part of remediation. This is a BareMetal cluster provider: the new node is NOT expected to have a new name",
 							true},
 					})
 				})
@@ -329,7 +329,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					verifyEvents([]expectedEvent{
 						{v1.EventTypeNormal,
 							"PermanentNodeDeletionExpected",
-							"Machine will be deleted for remediation. This is a Cloud cluster provider: the new node is expected to have a new name",
+							"Machine will be deleted as part of remediation. This is a Cloud cluster provider: the new node is expected to have a new name",
 							true},
 					})
 				})
@@ -347,7 +347,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					verifyEvents([]expectedEvent{
 						{v1.EventTypeNormal,
 							"PermanentNodeDeletionExpected",
-							"Machine will be deleted for remediation. Unknown cluster provider: no information about the new node's name",
+							"Machine will be deleted as part of remediation. Unknown cluster provider: no information about the new node's name",
 							true},
 					})
 				})
@@ -592,9 +592,9 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					underTest = createRemediationOwnedByMHC("remediation-name", workerNodeMachine)
 				})
 
-				It("MHC worker machine is deleted; logs node not found error", func() {
+				It("MHC worker machine is deleted; logs failed to get node", func() {
 					Eventually(func() bool {
-						return plogs.Contains(nodeNotFoundErrorMsg) && plogs.Contains(workerNodeMachine.Status.NodeRef.Name)
+						return plogs.Contains("failed to get node") && plogs.Contains(workerNodeMachine.Status.NodeRef.Name)
 					}, 30*time.Second, 1*time.Second).Should(BeTrue())
 
 					// Machine should still be deleted despite node not existing

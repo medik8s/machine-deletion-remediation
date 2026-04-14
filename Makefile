@@ -235,42 +235,45 @@ $(LOCALBIN):
 .PHONY: controller-gen
 CONTROLLER_GEN = $(LOCALBIN)/controller-gen
 controller-gen: ## Download controller-gen locally if necessary
-	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_GEN_VERSION))
-
+	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen,$(CONTROLLER_GEN_VERSION))
 
 .PHONY: kustomize
 KUSTOMIZE = $(LOCALBIN)/kustomize
 kustomize: ## Download kustomize locally if necessary
-	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/$(KUSTOMIZE_API_VERSION)@$(KUSTOMIZE_VERSION))
+	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/$(KUSTOMIZE_API_VERSION),$(KUSTOMIZE_VERSION))
 
 .PHONY: envtest
 ENVTEST = $(LOCALBIN)/setup-envtest
 envtest: ## Download envtest-setup locally if necessary.
-	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_VERSION))
+	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest,$(ENVTEST_VERSION))
 
 .PHONY: goimports
 GOIMPORTS = $(LOCALBIN)/goimports
 goimports: ## Download goimports locally if necessary.
-	$(call go-install-tool,$(GOIMPORTS),golang.org/x/tools/cmd/goimports@$(GOIMPORTS_VERSION))
+	$(call go-install-tool,$(GOIMPORTS),golang.org/x/tools/cmd/goimports,$(GOIMPORTS_VERSION))
 
 .PHONY: sort-imports
 SORT_IMPORTS = $(LOCALBIN)/sort-imports
 sort-imports: ## Download sort-imports locally if necessary.
-	$(call go-install-tool,$(SORT_IMPORTS),github.com/slintes/sort-imports@$(SORT_IMPORTS_VERSION))
+	$(call go-install-tool,$(SORT_IMPORTS),github.com/slintes/sort-imports,$(SORT_IMPORTS_VERSION))
 
 .PHONY: yq
 YQ = $(LOCALBIN)/yq
 yq: ## Download yq locally if necessary.
-	@$(call go-install-tool,$(YQ),github.com/mikefarah/yq/$(YQ_API_VERSION)@$(YQ_VERSION))
+	@$(call go-install-tool,$(YQ),github.com/mikefarah/yq/$(YQ_API_VERSION),$(YQ_VERSION))
 
-# go-install-tool will 'go install' any package $2 and install it to $1.
+# go-install-tool will 'go install' package $2@$3 and install it to $1.
+# Uses version-stamped binaries to detect version mismatches: if the
+# Makefile pins v0.20.0 but bin/ has v0.19.0, the tool is re-downloaded.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 define go-install-tool
-@[ -f $(1) ] || { \
+@[ -f "$(1)-$(3)" ] || { \
 set -e ;\
-echo "Downloading $(2)" ;\
-GOBIN=$(PROJECT_DIR)/bin GOFLAGS='' go install $(2) ;\
-}
+echo "Downloading $(2)@$(3)" ;\
+GOBIN=$(PROJECT_DIR)/bin GOFLAGS='' go install $(2)@$(3) ;\
+mv -f "$(PROJECT_DIR)/bin/$$(echo "$(2)" | sed 's,/v[0-9][0-9]*$$,,; s,.*/,,')" "$(1)-$(3)" ;\
+} ;\
+ln -sf "$(notdir $(1)-$(3))" "$(1)"
 endef
 
 .PHONY: opm

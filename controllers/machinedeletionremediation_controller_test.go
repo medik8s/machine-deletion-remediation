@@ -592,9 +592,9 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					underTest = createRemediationOwnedByMHC("remediation-name", workerNodeMachine)
 				})
 
-				It("MHC worker machine is deleted; logs failed to get node", func() {
+				It("MHC worker machine is deleted; logs node not found error", func() {
 					Eventually(func() bool {
-						return plogs.Contains("failed to get node") && plogs.Contains(workerNodeMachine.Status.NodeRef.Name)
+						return plogs.Contains(nodeNotFoundErrorMsg) && plogs.Contains(workerNodeMachine.Status.NodeRef.Name)
 					}, 30*time.Second, 1*time.Second).Should(BeTrue())
 
 					// Machine should still be deleted despite node not existing

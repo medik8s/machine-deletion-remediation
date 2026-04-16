@@ -60,7 +60,7 @@ const (
 	noMachineAnnotationError           = "failed to find openshift machine annotation on node name: %s"
 	invalidValueMachineAnnotationError = "failed to extract Machine Name and Machine Namespace from machine annotation on the node for node name: %s"
 	failedToDeleteMachineError         = "failed to delete machine of node name: %s"
-	nodeNotFoundErrorMsg               = "could not get the node"
+	nodeNotFoundErrorMsg               = "could not get the node - node not found"
 	machineNotFoundErrorMsg            = "could not get node's machine"
 	noControllerOwnerErrorMsg          = "ignoring remediation of the machine: the machine has no controller owner"
 	// Cluster Provider messages
@@ -200,12 +200,16 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 
 	log.Info("target machine found", "machine", machine.GetName())
 
-	// Verify if the node referenced by the machine can be retrieved
+	// Verify if the node referenced by the machine exists
 	if machine.Status.NodeRef != nil {
 		node := &v1.Node{}
 		nodeKey := client.ObjectKey{Name: machine.Status.NodeRef.Name}
 		if err := r.Get(ctx, nodeKey, node); err != nil {
-			log.Error(err, "failed to get node", "node name", machine.Status.NodeRef.Name)
+			if apiErrors.IsNotFound(err) {
+				log.Error(err, nodeNotFoundErrorMsg, "node name", machine.Status.NodeRef.Name)
+			} else {
+				log.Error(err, "failed to get node", "node name", machine.Status.NodeRef.Name)
+			}
 		}
 	} else {
 		log.Info(machineHasNoNodeRefInfo)

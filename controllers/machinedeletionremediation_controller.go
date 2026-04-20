@@ -64,9 +64,9 @@ const (
 	machineNotFoundErrorMsg            = "could not get node's machine"
 	noControllerOwnerErrorMsg          = "ignoring remediation of the machine: the machine has no controller owner"
 	// Cluster Provider messages
-	machineDeletedOnCloudProviderMessage     = "Machine will be deleted as part of remediation. This is a Cloud cluster provider: the new node is expected to have a new name"
-	machineDeletedOnBareMetalProviderMessage = "Machine will be deleted as part of remediation. This is a BareMetal cluster provider: the new node is NOT expected to have a new name"
-	machineDeletedOnUnknownProviderMessage   = "Machine will be deleted as part of remediation. Unknown cluster provider: no information about the new node's name"
+	machineDeletedOnCloudProviderMessage     = "Node's machine will be deleted as part of remediation. This is a Cloud cluster provider: the new node is expected to have a new name"
+	machineDeletedOnBareMetalProviderMessage = "Node's machine will be deleted as part of remediation. This is a BareMetal cluster provider: the new node is NOT expected to have a new name"
+	machineDeletedOnUnknownProviderMessage   = "Node's machine will be deleted as part of remediation. Unknown cluster provider: no information about the new node's name"
 )
 
 type conditionChangeReason string

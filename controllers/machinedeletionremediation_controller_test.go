@@ -312,7 +312,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					verifyEvents([]expectedEvent{
 						{v1.EventTypeNormal,
 							"PermanentNodeDeletionExpected",
-							"Machine will be deleted as part of remediation. This is a BareMetal cluster provider: the new node is NOT expected to have a new name",
+							machineDeletedOnBareMetalProviderMessage,
 							true},
 					})
 				})
@@ -329,7 +329,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					verifyEvents([]expectedEvent{
 						{v1.EventTypeNormal,
 							"PermanentNodeDeletionExpected",
-							"Machine will be deleted as part of remediation. This is a Cloud cluster provider: the new node is expected to have a new name",
+							machineDeletedOnCloudProviderMessage,
 							true},
 					})
 				})
@@ -347,7 +347,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					verifyEvents([]expectedEvent{
 						{v1.EventTypeNormal,
 							"PermanentNodeDeletionExpected",
-							"Machine will be deleted as part of remediation. Unknown cluster provider: no information about the new node's name",
+							machineDeletedOnUnknownProviderMessage,
 							true},
 					})
 				})

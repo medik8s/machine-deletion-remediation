@@ -60,7 +60,7 @@ const (
 	noMachineAnnotationError           = "failed to find openshift machine annotation on node name: %s"
 	invalidValueMachineAnnotationError = "failed to extract Machine Name and Machine Namespace from machine annotation on the node for node name: %s"
 	failedToDeleteMachineError         = "failed to delete machine of node name: %s"
-	nodeNotFoundErrorMsg               = "could not get the node - node not found"
+	nodeNotFoundErrorMsg               = "could not get the node: node not found"
 	machineNotFoundErrorMsg            = "could not get node's machine"
 	noControllerOwnerErrorMsg          = "ignoring remediation of the machine: the machine has no controller owner"
 	// Cluster Provider messages

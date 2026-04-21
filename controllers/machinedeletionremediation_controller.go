@@ -64,9 +64,9 @@ const (
 	machineNotFoundErrorMsg            = "could not get node's machine"
 	noControllerOwnerErrorMsg          = "ignoring remediation of the machine: the machine has no controller owner"
 	// Cluster Provider messages
-	machineDeletedOnCloudProviderMessage     = "Node's machine will be deleted as part of remediation. This is a Cloud cluster provider: the new node is expected to have a new name"
-	machineDeletedOnBareMetalProviderMessage = "Node's machine will be deleted as part of remediation. This is a BareMetal cluster provider: the new node is NOT expected to have a new name"
-	machineDeletedOnUnknownProviderMessage   = "Node's machine will be deleted as part of remediation. Unknown cluster provider: no information about the new node's name"
+	machineDeletedOnCloudProviderMessage     = "Machine will be deleted as part of remediation. This is a Cloud cluster provider: the new node is expected to have a new name"
+	machineDeletedOnBareMetalProviderMessage = "Machine will be deleted as part of remediation. This is a BareMetal cluster provider: the new node is NOT expected to have a new name"
+	machineDeletedOnUnknownProviderMessage   = "Machine will be deleted as part of remediation. Unknown cluster provider: no information about the new node's name"
 )
 
 type conditionChangeReason string
@@ -205,11 +205,13 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 		node := &v1.Node{}
 		nodeKey := client.ObjectKey{Name: machine.Status.NodeRef.Name}
 		if err := r.Get(ctx, nodeKey, node); err != nil {
+			var msg string
 			if apiErrors.IsNotFound(err) {
-				log.Error(err, nodeNotFoundErrorMsg, "node name", machine.Status.NodeRef.Name)
+				msg = nodeNotFoundErrorMsg
 			} else {
-				log.Error(err, "failed to get node", "node name", machine.Status.NodeRef.Name)
+				msg = "failed to get node"
 			}
+			log.Error(err, msg+", remediation is safe to continue despite node status", "node name", machine.Status.NodeRef.Name)
 		}
 	} else {
 		log.Info(machineHasNoNodeRefInfo)

@@ -54,18 +54,19 @@ const (
 	// Infos
 	postponedMachineDeletionInfo  = "target machine was not deleted yet"
 	successfulMachineDeletionInfo = "target machine correctly deleted"
+	machineHasNoNodeRefInfo       = "machine has no nodeRef"
 	//Errors
 	noAnnotationsError                 = "failed to find machine annotation on node name: %s"
 	noMachineAnnotationError           = "failed to find openshift machine annotation on node name: %s"
 	invalidValueMachineAnnotationError = "failed to extract Machine Name and Machine Namespace from machine annotation on the node for node name: %s"
 	failedToDeleteMachineError         = "failed to delete machine of node name: %s"
-	nodeNotFoundErrorMsg               = "could not get the node"
+	nodeNotFoundErrorMsg               = "could not get the node: node not found"
 	machineNotFoundErrorMsg            = "could not get node's machine"
 	noControllerOwnerErrorMsg          = "ignoring remediation of the machine: the machine has no controller owner"
 	// Cluster Provider messages
-	machineDeletedOnCloudProviderMessage     = "Machine will be deleted and the unhealthy node replaced. This is a Cloud cluster provider: the new node is expected to have a new name"
-	machineDeletedOnBareMetalProviderMessage = "Machine will be deleted and the unhealthy node replaced. This is a BareMetal cluster provider: the new node is NOT expected to have a new name"
-	machineDeletedOnUnknownProviderMessage   = "Machine will be deleted and the unhealthy node replaced. Unknown cluster provider: no information about the new node's name"
+	machineDeletedOnCloudProviderMessage     = "Machine will be deleted as part of remediation. This is a Cloud cluster provider: the new node is expected to have a new name"
+	machineDeletedOnBareMetalProviderMessage = "Machine will be deleted as part of remediation. This is a BareMetal cluster provider: the new node is NOT expected to have a new name"
+	machineDeletedOnUnknownProviderMessage   = "Machine will be deleted as part of remediation. Unknown cluster provider: no information about the new node's name"
 )
 
 type conditionChangeReason string
@@ -198,6 +199,23 @@ func (r *MachineDeletionRemediationReconciler) Reconcile(ctx context.Context, re
 	}
 
 	log.Info("target machine found", "machine", machine.GetName())
+
+	// Verify if the node referenced by the machine exists
+	if machine.Status.NodeRef != nil {
+		node := &v1.Node{}
+		nodeKey := client.ObjectKey{Name: machine.Status.NodeRef.Name}
+		if err := r.Get(ctx, nodeKey, node); err != nil {
+			var msg string
+			if apiErrors.IsNotFound(err) {
+				msg = nodeNotFoundErrorMsg
+			} else {
+				msg = "failed to get node"
+			}
+			log.Error(err, msg+", remediation is safe to continue despite node status", "node name", machine.Status.NodeRef.Name)
+		}
+	} else {
+		log.Info(machineHasNoNodeRefInfo)
+	}
 
 	// Detect if Node name is expected to change after Machine deletion given
 	// the Platform type. In case of BareMetal platform, the name is NOT

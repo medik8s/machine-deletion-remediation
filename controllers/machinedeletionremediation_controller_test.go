@@ -312,7 +312,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					verifyEvents([]expectedEvent{
 						{v1.EventTypeNormal,
 							"PermanentNodeDeletionExpected",
-							"Machine will be deleted and the unhealthy node replaced. This is a BareMetal cluster provider: the new node is NOT expected to have a new name",
+							machineDeletedOnBareMetalProviderMessage,
 							true},
 					})
 				})
@@ -329,7 +329,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					verifyEvents([]expectedEvent{
 						{v1.EventTypeNormal,
 							"PermanentNodeDeletionExpected",
-							"Machine will be deleted and the unhealthy node replaced. This is a Cloud cluster provider: the new node is expected to have a new name",
+							machineDeletedOnCloudProviderMessage,
 							true},
 					})
 				})
@@ -347,7 +347,7 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					verifyEvents([]expectedEvent{
 						{v1.EventTypeNormal,
 							"PermanentNodeDeletionExpected",
-							"Machine will be deleted and the unhealthy node replaced. Unknown cluster provider: no information about the new node's name",
+							machineDeletedOnUnknownProviderMessage,
 							true},
 					})
 				})
@@ -581,7 +581,31 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 				})
 			})
 
-			When("Machine's node does not exist", func() {
+			When("Machine has nodeRef but referenced node does not exist", func() {
+				BeforeEach(func() {
+					// Set nodeRef on the machine pointing to a non-existent node
+					workerNodeMachine.Status.NodeRef = &v1.ObjectReference{
+						Kind: "Node",
+						Name: "missing-test-node",
+					}
+					Expect(k8sClient.Status().Update(context.Background(), workerNodeMachine)).To(Succeed())
+					underTest = createRemediationOwnedByMHC("remediation-name", workerNodeMachine)
+				})
+
+				It("MHC worker machine is deleted; logs node not found error", func() {
+					Eventually(func() bool {
+						return plogs.Contains(nodeNotFoundErrorMsg) && plogs.Contains(workerNodeMachine.Status.NodeRef.Name)
+					}, 30*time.Second, 1*time.Second).Should(BeTrue())
+
+					// Machine should still be deleted despite node not existing
+					verifyMachineIsDeleted(workerNodeMachineName)
+					verifyEvents([]expectedEvent{
+						{v1.EventTypeNormal, "RemediationStarted", "Remediation started", true},
+					})
+				})
+			})
+
+			When("Machine has no nodeRef", func() {
 				BeforeEach(func() {
 					// The actual remediation name should be the same as the Machine's name, however
 					// the test use a different name to make sure the target Machine is not found looking at the
@@ -589,7 +613,10 @@ var _ = Describe("Machine Deletion Remediation CR", func() {
 					underTest = createRemediationOwnedByMHC("remediation-name", phantomNodeMachine)
 				})
 
-				It("MHC worker machine is deleted", func() {
+				It("MHC worker machine is deleted; logs machine has no nodeRef", func() {
+					Eventually(func() bool {
+						return plogs.Contains(machineHasNoNodeRefInfo)
+					}, 30*time.Second, 1*time.Second).Should(BeTrue())
 					verifyMachineIsDeleted(phantomNodeMachineName)
 					verifyMachineNotDeleted(workerNodeMachineName)
 					verifyMachineNotDeleted(masterNodeMachineName)

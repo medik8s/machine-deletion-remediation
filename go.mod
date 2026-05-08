@@ -4,7 +4,7 @@ module github.com/medik8s/machine-deletion-remediation
 go 1.24.11
 
 // latest downstream version for security patches
-toolchain go1.25.3
+toolchain go1.25.10
 
 require (
 	github.com/go-logr/logr v1.4.3

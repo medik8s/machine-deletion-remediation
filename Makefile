@@ -11,7 +11,7 @@ OPERATOR_SDK_VERSION ?= v1.30.0
 OPM_VERSION = v1.28.0
 
 # CONTROLLER_GEN versions at https://github.com/kubernetes-sigs/controller-tools/releases
-CONTROLLER_GEN_VERSION = v0.12.0
+CONTROLLER_GEN_VERSION = v0.17.3
 
 # KUSTOMIZE versions at https://github.com/kubernetes-sigs/kustomize/releases
 # note: update KUSTOMIZE_VERSION and KUSTOMIZE_API_VERSION accordingly.
@@ -20,9 +20,12 @@ KUSTOMIZE_VERSION = v5.0.0
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.26
+# See https://github.com/kubernetes-sigs/controller-runtime/releases for the last version
+# setup-envtest@release-0.20 (GitHub-hosted envtest assets; legacy GCS bucket is deprecated).
+ENVTEST_VERSION ?= v0.0.0-20250517180713-32e5e9e948a5
 
 # GoImports versions at https://pkg.go.dev/golang.org/x/tools/cmd/goimports?tab=versions
-GOIMPORTS_VERSION ?= v0.11.0
+GOIMPORTS_VERSION ?= v0.30.0
 
 # Sort-imports versions at https://github.com/slintes/sort-imports/releases
 SORT_IMPORTS_VERSION = v0.2.1
@@ -167,8 +170,8 @@ fetch-mutation: ## fetch mutation package.
 # Use TEST_OPS to pass further options to `go test` (e.g. verbosity and/or -ginkgo.focus)
 export TEST_OPS ?= ""
 .PHONY: test
-test: manifests generate go-verify fmt vet test-imports envtest ## Generate and format code, run tests, generate manifests and bundle
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path  --bin-dir $(PROJECT_DIR)/testbin)" \
+test: manifests generate go-verify fmt vet test-imports envtest-assets ## Generate and format code, run tests, generate manifests and bundle
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(ENVTEST_ASSETS_DIR))" \
 		go test ./controllers/... -coverprofile cover.out ${TEST_OPS}
 
 .PHONY: test-mutation
@@ -240,9 +243,15 @@ kustomize: ## Download kustomize locally if necessary
 	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/$(KUSTOMIZE_API_VERSION)@$(KUSTOMIZE_VERSION))
 
 .PHONY: envtest
+ENVTEST_DIR ?= $(LOCALBIN)/setup-envtest
 ENVTEST = $(LOCALBIN)/setup-envtest
+ENVTEST_ASSETS_DIR ?= $(LOCALBIN)/k8s
 envtest: ## Download envtest-setup locally if necessary.
-	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest)
+	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@${ENVTEST_VERSION})
+
+.PHONY: envtest-assets
+envtest-assets: envtest ## Download kube-apiserver and etcd binaries for envtest.
+	$(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(ENVTEST_ASSETS_DIR)
 
 .PHONY: goimports
 GOIMPORTS = $(LOCALBIN)/goimports

@@ -47,7 +47,7 @@ metadata:
     capabilities: Basic Install
     categories: OpenShift Optional
     containerImage: ""
-    createdAt: ""
+    createdAt: "2026-05-18T13:29:36Z"
     description: Machine Deletion Remediation operator for reprovisioning unhealthy
       nodes using the Machine API.
     olm.skipRange: '>=0.0.1'
@@ -156,6 +156,7 @@ spec:
           - machine.openshift.io
           resources:
           - controlplanemachinesets
+          - machinesets
           verbs:
           - get
           - list
@@ -171,14 +172,6 @@ spec:
           - list
           - patch
           - update
-          - watch
-        - apiGroups:
-          - machine.openshift.io
-          resources:
-          - machinesets
-          verbs:
-          - get
-          - list
           - watch
         - apiGroups:
           - authentication.k8s.io

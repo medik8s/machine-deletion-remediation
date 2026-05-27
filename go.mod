@@ -1,6 +1,8 @@
 module github.com/medik8s/machine-deletion-remediation
 
-go 1.21
+go 1.25
+
+toolchain go1.25.9
 
 require (
 	github.com/go-logr/logr v1.4.1

@@ -11,7 +11,7 @@ OPERATOR_SDK_VERSION ?= v1.32.0
 OPM_VERSION = v1.36.0
 
 # CONTROLLER_GEN versions at https://github.com/kubernetes-sigs/controller-tools/releases
-CONTROLLER_GEN_VERSION = v0.14.0
+CONTROLLER_GEN_VERSION = v0.17.0
 
 # KUSTOMIZE versions at https://github.com/kubernetes-sigs/kustomize/releases
 # note: update KUSTOMIZE_VERSION and KUSTOMIZE_API_VERSION accordingly.

@@ -45,6 +45,7 @@ BLUE_ICON_PATH = "./config/assets/medik8s_blue_icon.png"
 DEFAULT_VERSION := 0.0.1
 VERSION ?= $(DEFAULT_VERSION)
 PREVIOUS_VERSION ?= $(DEFAULT_VERSION)
+SKIP_RANGE_LOWER ?=
 export VERSION
 
 # CHANNELS define the bundle channels used in the bundle.
@@ -385,14 +386,29 @@ CATALOG_DIR := catalog
 CATALOG_DOCKERFILE := ${CATALOG_DIR}.Dockerfile
 CATALOG_INDEX := $(CATALOG_DIR)/index.yaml
 
+# Add olm.channel entries for each channel in CHANNELS.
+# For development version (0.0.1), omit replaces and skipRange to avoid OLM catalog validation errors.
 .PHONY: add_channel_entry_for_the_bundle
 add_channel_entry_for_the_bundle:
-	@echo "---" >> ${CATALOG_INDEX}
-	@echo "schema: olm.channel" >> ${CATALOG_INDEX}
-	@echo "package: ${OPERATOR_NAME}" >> ${CATALOG_INDEX}
-	@echo "name: ${CHANNELS}" >> ${CATALOG_INDEX}
-	@echo "entries:" >> ${CATALOG_INDEX}
-	@echo "  - name: ${OPERATOR_NAME}.v${VERSION}" >> ${CATALOG_INDEX}
+	@for channel in $(shell echo ${CHANNELS} | tr ',' ' '); do \
+		echo "---" >> ${CATALOG_INDEX}; \
+		echo "schema: olm.channel" >> ${CATALOG_INDEX}; \
+		echo "package: ${OPERATOR_NAME}" >> ${CATALOG_INDEX}; \
+		echo "name: $$channel" >> ${CATALOG_INDEX}; \
+		echo "entries:" >> ${CATALOG_INDEX}; \
+		echo "  - name: ${OPERATOR_NAME}.v${VERSION}" >> ${CATALOG_INDEX}; \
+		\
+		if [ -n "${PREVIOUS_VERSION}" ] && [ "${VERSION}" != "${DEFAULT_VERSION}" ] && [ "${PREVIOUS_VERSION}" != "${DEFAULT_VERSION}" ]; then \
+			echo "    replaces: ${OPERATOR_NAME}.v${PREVIOUS_VERSION}" >> ${CATALOG_INDEX}; \
+		fi; \
+		if [ -n "${SKIP_RANGE_LOWER}" ] && [ "${VERSION}" != "${DEFAULT_VERSION}" ] && [ "${VERSION}" != "${SKIP_RANGE_LOWER}" ]; then \
+			if ! printf '%s\n' "${SKIP_RANGE_LOWER}" "${VERSION}" | sort -V -C 2>/dev/null; then \
+				echo "Error: VERSION (${VERSION}) must be greater than SKIP_RANGE_LOWER (${SKIP_RANGE_LOWER})"; \
+				exit 1; \
+			fi; \
+			echo "    skipRange: '>=${SKIP_RANGE_LOWER} <${VERSION}'" >> ${CATALOG_INDEX}; \
+		fi; \
+	done
 
 .PHONY: catalog-build
 catalog-build: opm ## Build a file-based catalog image.
@@ -401,7 +417,7 @@ catalog-build: opm ## Build a file-based catalog image.
 	@mkdir -p ${CATALOG_DIR}
 	$(OPM) generate dockerfile ${CATALOG_DIR}
 	$(OPM) init ${OPERATOR_NAME} \
-		--default-channel=${CHANNELS} \
+		--default-channel=${DEFAULT_CHANNEL} \
 		--description=./README.md \
 		--icon=${BLUE_ICON_PATH} \
 		--output yaml \

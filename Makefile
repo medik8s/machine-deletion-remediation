@@ -366,17 +366,17 @@ bundle-push: ## Push the bundle image.
 	$(MAKE) docker-push IMG=$(BUNDLE_IMG)
 
 .PHONY: bundle-run
-export BUNDLE_RUN_NAMESPACE ?= openshift-workload-availability
+OPERATOR_NAMESPACE ?= openshift-workload-availability
 bundle-run: operator-sdk ## Run bundle image
-	$(OPERATOR_SDK) -n $(BUNDLE_RUN_NAMESPACE) run bundle $(BUNDLE_IMG)
+	$(OPERATOR_SDK) -n $(OPERATOR_NAMESPACE) run bundle $(BUNDLE_IMG)
 
 .PHONY: bundle-run-update
 bundle-run-update: operator-sdk ## Upgrade bundle image
-	$(OPERATOR_SDK) -n $(BUNDLE_RUN_NAMESPACE) run bundle-upgrade $(BUNDLE_IMG)
+	$(OPERATOR_SDK) -n $(OPERATOR_NAMESPACE) run bundle-upgrade $(BUNDLE_IMG)
 
 .PHONY: bundle-cleanup
 bundle-cleanup: operator-sdk ## Remove bundle installed via bundle-run
-	$(OPERATOR_SDK) -n $(BUNDLE_RUN_NAMESPACE) cleanup $(OPERATOR_NAME)
+	$(OPERATOR_SDK) -n $(OPERATOR_NAMESPACE) cleanup $(OPERATOR_NAME)
 
 # Build a file-based catalog image
 # https://docs.openshift.com/container-platform/4.14/operators/admin/olm-managing-custom-catalogs.html#olm-managing-custom-catalogs-fb

@@ -68,6 +68,17 @@ endif
 DEFAULT_CHANNEL ?= stable
 export DEFAULT_CHANNEL
 
+# Validate DEFAULT_CHANNEL is in CHANNELS
+# When CHANNELS contains comma-separated values (e.g., "stable,beta"), we need to convert
+# commas to spaces for filter to match. We use a variable for the comma because Make treats
+# commas as function argument delimiters, causing $(subst ,, ,$(CHANNELS)) to misparse.
+comma := ,
+ifneq (,$(DEFAULT_CHANNEL))
+  ifeq (,$(filter $(DEFAULT_CHANNEL),$(subst $(comma), ,$(CHANNELS))))
+    $(error DEFAULT_CHANNEL "$(DEFAULT_CHANNEL)" must be present in CHANNELS "$(CHANNELS)")
+  endif
+endif
+
 ifneq ($(origin DEFAULT_CHANNEL), undefined)
 BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
 endif

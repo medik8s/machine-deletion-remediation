@@ -176,6 +176,14 @@ spec:
           - update
           - watch
         - apiGroups:
+          - networking.k8s.io
+          resources:
+          - networkpolicies
+          verbs:
+          - create
+          - delete
+          - update
+        - apiGroups:
           - authentication.k8s.io
           resources:
           - tokenreviews

@@ -102,6 +102,7 @@ type MachineDeletionRemediationReconciler struct {
 //+kubebuilder:rbac:groups=machine.openshift.io,resources=machinesets,verbs=get;list;watch
 //+kubebuilder:rbac:groups=machine.openshift.io,resources=controlplanemachinesets,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
+//+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=create;delete;update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.

@@ -17,14 +17,18 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"fmt"
 	"os"
 	"runtime"
+	"time"
 
 	"go.uber.org/zap/zapcore"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -33,13 +37,16 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
+	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+	openshifttls "github.com/openshift/controller-runtime-common/pkg/tls"
 
 	appv1alpha1 "github.com/medik8s/machine-deletion-remediation/api/v1alpha1"
 	"github.com/medik8s/machine-deletion-remediation/internal/controller"
@@ -54,11 +61,14 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(configv1.Install(scheme))
 	utilruntime.Must(appv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(machinev1.Install(scheme))
 	utilruntime.Must(machinev1beta1.Install(scheme))
 	//+kubebuilder:scaffold:scheme
 }
+
+//+kubebuilder:rbac:groups=config.openshift.io,resources=apiservers,verbs=get;list;watch
 
 func main() {
 	var metricsAddr string
@@ -80,24 +90,48 @@ func main() {
 
 	printVersion()
 
-	// Disable HTTP/2 support to avoid issues with CVE HTTP/2 Rapid Reset.
-	// Currently, the metrics server enables/disables HTTP/2 support only if SecureServing is enabled, which is not.
-	// Adding the disabling logic anyway to avoid future issues.
-	disableHTTP2 := func(c *tls.Config) {
-		setupLog.Info("disabling HTTP/2 support")
+	var tlsOpts []func(*tls.Config)
+	tlsOpts = append(tlsOpts, func(c *tls.Config) {
 		c.NextProtos = []string{"http/1.1"}
+	})
+
+	cfg := ctrl.GetConfigOrDie()
+	setupClient, err := client.New(cfg, client.Options{Scheme: scheme})
+	if err != nil {
+		setupLog.Error(err, "unable to create setup client")
+		os.Exit(1)
 	}
 
-	metricsOpts := server.Options{
-		BindAddress:    metricsAddr,
-		SecureServing:  true,
-		FilterProvider: filters.WithAuthenticationAndAuthorization,
-		TLSOpts:        []func(*tls.Config){disableHTTP2},
+	isOpenShift := true
+	fetchCtx, fetchCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer fetchCancel()
+	tlsProfile, err := openshifttls.FetchAPIServerTLSProfile(fetchCtx, setupClient)
+	if err != nil {
+		if meta.IsNoMatchError(err) || apierrors.IsNotFound(err) {
+			setupLog.Info("Not on OpenShift, using default TLS settings")
+			isOpenShift = false
+		} else {
+			setupLog.Error(err, "failed to fetch TLS profile")
+			os.Exit(1)
+		}
 	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
-		Metrics:                metricsOpts,
+	if isOpenShift {
+		tlsConfig, unsupported := openshifttls.NewTLSConfigFromProfile(tlsProfile)
+		if len(unsupported) > 0 {
+			setupLog.Info("Unsupported TLS ciphers ignored", "ciphers", unsupported)
+		}
+		tlsOpts = append(tlsOpts, tlsConfig)
+	}
+
+	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
+		Scheme: scheme,
+		Metrics: server.Options{
+			BindAddress:    metricsAddr,
+			SecureServing:  true,
+			FilterProvider: filters.WithAuthenticationAndAuthorization,
+			TLSOpts:        tlsOpts,
+		},
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "285d4098.example.com",
@@ -118,6 +152,24 @@ func main() {
 	}
 	//+kubebuilder:scaffold:builder
 
+	ctx, cancel := context.WithCancel(ctrl.SetupSignalHandler())
+	defer cancel()
+
+	if isOpenShift {
+		watcher := &openshifttls.SecurityProfileWatcher{
+			Client:                mgr.GetClient(),
+			InitialTLSProfileSpec: tlsProfile,
+			OnProfileChange: func(_ context.Context, _, _ configv1.TLSProfileSpec) {
+				setupLog.Info("TLS profile changed, restarting")
+				cancel()
+			},
+		}
+		if err := watcher.SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to set up TLS profile watcher")
+			os.Exit(1)
+		}
+	}
+
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")
 		os.Exit(1)
@@ -128,7 +180,7 @@ func main() {
 	}
 
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}

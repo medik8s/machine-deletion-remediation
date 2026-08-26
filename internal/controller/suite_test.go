@@ -39,7 +39,7 @@ import (
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	_ "github.com/openshift/api/machine/v1beta1/zz_generated.crd-manifests"
 
-	"github.com/medik8s/machine-deletion-remediation/api/v1alpha1"
+	"github.com/medik8s/machine-deletion-remediation/v5/api/v1alpha1"
 	//+kubebuilder:scaffold:imports
 )
 

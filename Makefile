@@ -3,6 +3,9 @@ SHELL := /bin/bash
 
 OPERATOR_NAME := machine-deletion-remediation
 
+# PACKAGE_NAME is the OLM package name
+PACKAGE_NAME ?= medik8s-$(OPERATOR_NAME)
+
 ## Tool versions
 # OPERATOR_SDK versions at https://github.com/operator-framework/operator-sdk/releases
 # heads up: 1.37 is the last version which supports go/v3!
@@ -314,22 +317,22 @@ endef
 
 .PHONY: bundle
 bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metadata, then validate generated files.
-	$(OPERATOR_SDK) generate kustomize manifests -q
+	$(OPERATOR_SDK) generate kustomize manifests -q --package $(PACKAGE_NAME)
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
-	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --overwrite --version $(VERSION) --package $(PACKAGE_NAME) $(BUNDLE_METADATA_OPTS)
 	$(MAKE) bundle-validate
 
 ## Some addition to bundle creation in the bundle
 DEFAULT_ICON_BASE64 := $(shell base64 --wrap=0 ${BLUE_ICON_PATH})
 export ICON_BASE64 ?= ${DEFAULT_ICON_BASE64}
-export CSV="./bundle/manifests/$(OPERATOR_NAME).clusterserviceversion.yaml"
+export CSV="./bundle/manifests/$(PACKAGE_NAME).clusterserviceversion.yaml"
 
 .PHONY: bundle-update
 bundle-update: verify-previous-version ## Update CSV fields and validate the bundle directory
 	sed -r -i "s|containerImage: .*|containerImage: $(IMG)|;" ${CSV}
 	sed -r -i "s|createdAt: .*|createdAt: \"`date '+%Y-%m-%d %T'`\"|;" ${CSV}
 	sed -r -i "s|base64data:.*|base64data: ${ICON_BASE64}|;" ${CSV}
-	sed -r -i "s|replaces: .*|replaces: machine-deletion-remediation.v${PREVIOUS_VERSION}|;" ${CSV}
+	sed -r -i "s|replaces: .*|replaces: $(PACKAGE_NAME).v${PREVIOUS_VERSION}|;" ${CSV}
 	$(MAKE) bundle-validate
 
 .PHONY: bundle-reset
@@ -338,7 +341,7 @@ bundle-reset: ## Revert all version or build date related changes
 	sed -r -i "s|containerImage: .*|containerImage: \"\"|;" ${CSV}
 	sed -r -i "s|createdAt: .*|createdAt: \"\"|;" ${CSV}
 	sed -r -i "s|base64data:.*|base64data: base64EncodedIcon|;" ${CSV}
-	sed -r -i "s|replaces: .*|replaces: machine-deletion-remediation.v${DEFAULT_VERSION}|;" ${CSV}
+	sed -r -i "s|replaces: .*|replaces: $(PACKAGE_NAME).v${DEFAULT_VERSION}|;" ${CSV}
 
 .PHONY: verify-previous-version
 verify-previous-version: ## Verifies that PREVIOUS_VERSION variable is set
@@ -392,7 +395,7 @@ bundle-run-update: operator-sdk ## Upgrade bundle image
 
 .PHONY: bundle-cleanup
 bundle-cleanup: operator-sdk ## Remove bundle installed via bundle-run
-	$(OPERATOR_SDK) -n $(OPERATOR_NAMESPACE) cleanup $(OPERATOR_NAME)
+	$(OPERATOR_SDK) -n $(OPERATOR_NAMESPACE) cleanup $(PACKAGE_NAME)
 
 # Build a file-based catalog image
 # https://docs.openshift.com/container-platform/4.14/operators/admin/olm-managing-custom-catalogs.html#olm-managing-custom-catalogs-fb
@@ -408,13 +411,13 @@ add_channel_entry_for_the_bundle:
 	@for channel in $(shell echo ${CHANNELS} | tr ',' ' '); do \
 		echo "---" >> ${CATALOG_INDEX}; \
 		echo "schema: olm.channel" >> ${CATALOG_INDEX}; \
-		echo "package: ${OPERATOR_NAME}" >> ${CATALOG_INDEX}; \
+		echo "package: ${PACKAGE_NAME}" >> ${CATALOG_INDEX}; \
 		echo "name: $$channel" >> ${CATALOG_INDEX}; \
 		echo "entries:" >> ${CATALOG_INDEX}; \
-		echo "  - name: ${OPERATOR_NAME}.v${VERSION}" >> ${CATALOG_INDEX}; \
+		echo "  - name: ${PACKAGE_NAME}.v${VERSION}" >> ${CATALOG_INDEX}; \
 		\
 		if [ -n "${PREVIOUS_VERSION}" ] && [ "${VERSION}" != "${DEFAULT_VERSION}" ] && [ "${PREVIOUS_VERSION}" != "${DEFAULT_VERSION}" ]; then \
-			echo "    replaces: ${OPERATOR_NAME}.v${PREVIOUS_VERSION}" >> ${CATALOG_INDEX}; \
+			echo "    replaces: ${PACKAGE_NAME}.v${PREVIOUS_VERSION}" >> ${CATALOG_INDEX}; \
 		fi; \
 		if [ -n "${SKIP_RANGE_LOWER}" ] && [ "${VERSION}" != "${DEFAULT_VERSION}" ] && [ "${VERSION}" != "${SKIP_RANGE_LOWER}" ]; then \
 			if ! printf '%s\n' "${SKIP_RANGE_LOWER}" "${VERSION}" | sort -V -C 2>/dev/null; then \
@@ -431,7 +434,7 @@ catalog-build: opm ## Build a file-based catalog image.
 	-rm -r ${CATALOG_DIR} ${CATALOG_DOCKERFILE}
 	@mkdir -p ${CATALOG_DIR}
 	$(OPM) generate dockerfile ${CATALOG_DIR}
-	$(OPM) init ${OPERATOR_NAME} \
+	$(OPM) init ${PACKAGE_NAME} \
 		--default-channel=${DEFAULT_CHANNEL} \
 		--description=./README.md \
 		--icon=${BLUE_ICON_PATH} \

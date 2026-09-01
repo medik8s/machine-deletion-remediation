@@ -44,7 +44,7 @@ CONTAINER_TOOL ?= podman
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-DEFAULT_VERSION := 0.0.1
+DEFAULT_VERSION := 5.8.0
 VERSION ?= $(DEFAULT_VERSION)
 PREVIOUS_VERSION ?= $(DEFAULT_VERSION)
 SKIP_RANGE_LOWER ?=

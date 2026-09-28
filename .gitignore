@@ -24,3 +24,4 @@ bin
 
 catalog/
 catalog.Dockerfile
+.tools/

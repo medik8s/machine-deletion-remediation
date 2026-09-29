@@ -46,11 +46,11 @@ metadata:
       ]
     capabilities: Basic Install
     categories: OpenShift Optional
-    containerImage: ""
+    containerImage: quay.io/medik8s/machine-deletion-remediation-operator:v5.8.0
     createdAt: ""
     description: Machine Deletion Remediation operator for reprovisioning unhealthy
       nodes using the Machine API.
-    olm.skipRange: '>=0.0.1'
+    olm.skipRange: '>=0.0.1 <5.8.0'
     operatorframework.io/suggested-namespace: openshift-workload-availability
     operatorframework.io/suggested-namespace-template: '{"kind":"Namespace","apiVersion":"v1","metadata":{"name":"openshift-workload-availability","annotations":{"openshift.io/node-selector":""}}}'
     operators.operatorframework.io/builder: operator-sdk-v1.42.2
@@ -218,7 +218,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: quay.io/medik8s/machine-deletion-remediation-operator:latest
+                image: quay.io/medik8s/machine-deletion-remediation-operator:v5.8.0
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -316,5 +316,5 @@ spec:
   provider:
     name: Medik8s
     url: https://github.com/medik8s
-  replaces: machine-deletion-remediation.v5.8.0
+  replaces: machine-deletion-remediation.v0.7.1
   version: 5.8.0

@@ -46,8 +46,8 @@ CONTAINER_TOOL ?= podman
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 DEFAULT_VERSION := 5.8.0
 VERSION ?= $(DEFAULT_VERSION)
-PREVIOUS_VERSION ?= $(DEFAULT_VERSION)
-SKIP_RANGE_LOWER ?=
+PREVIOUS_VERSION ?= 0.7.1
+SKIP_RANGE_LOWER ?= 0.0.1
 export VERSION
 
 # CHANNELS define the bundle channels used in the bundle.
@@ -91,12 +91,8 @@ MANIFESTS_DIR ?= config/manifests
 IMAGE_REGISTRY ?= quay.io/medik8s
 export IMAGE_REGISTRY
 
-# When no version is set, use latest as image tags
-ifeq ($(VERSION), $(DEFAULT_VERSION))
-IMAGE_TAG = latest
-else
+# Use the selected version for image tags.
 IMAGE_TAG = v$(VERSION)
-endif
 export IMAGE_TAG
 
 # IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
@@ -347,19 +343,19 @@ bundle-update: verify-previous-version ## Update CSV fields and validate the bun
 
 .PHONY: bundle-reset
 bundle-reset: ## Revert all version or build date related changes
-	VERSION=${DEFAULT_VERSION} IMG=$(IMAGE_TAG_BASE)-operator:latest; $(MAKE) manifests bundle
-	sed -r -i "s|containerImage: .*|containerImage: \"\"|;" ${CSV}
+	VERSION=$(DEFAULT_VERSION) $(MAKE) manifests bundle
 	sed -r -i "s|createdAt: .*|createdAt: \"\"|;" ${CSV}
 	sed -r -i "s|base64data:.*|base64data: base64EncodedIcon|;" ${CSV}
-	sed -r -i "s|replaces: .*|replaces: machine-deletion-remediation.v${DEFAULT_VERSION}|;" ${CSV}
+	sed -r -i "s|replaces: .*|replaces: machine-deletion-remediation.v${PREVIOUS_VERSION}|;" ${CSV}
+	sed -r -i "s|olm.skipRange: .*|olm.skipRange: '>=${SKIP_RANGE_LOWER} <$(DEFAULT_VERSION)'|;" ${CSV}
+	VERSION=$(DEFAULT_VERSION) $(MAKE) bundle-validate
 
 .PHONY: verify-previous-version
 verify-previous-version: ## Verifies that PREVIOUS_VERSION variable is set
-	@if [ $(VERSION) != $(DEFAULT_VERSION) ] && \
-		[ $(PREVIOUS_VERSION) == $(DEFAULT_VERSION) ]; then \
-  			echo "Error: PREVIOUS_VERSION must be set for the selected VERSION"; \
-    		exit 1; \
-    fi
+	@if [ -z "$(PREVIOUS_VERSION)" ] || [ "$(PREVIOUS_VERSION)" = "$(VERSION)" ]; then \
+		echo "Error: PREVIOUS_VERSION must be set and differ from VERSION"; \
+		exit 1; \
+	fi
 
 .PHONY: bundle-community-okd
 bundle-community-okd: bundle ## Update displayName field in the bundle's CSV
@@ -415,7 +411,7 @@ CATALOG_DOCKERFILE := ${CATALOG_DIR}.Dockerfile
 CATALOG_INDEX := $(CATALOG_DIR)/index.yaml
 
 # Add olm.channel entries for each channel in CHANNELS.
-# For development version (0.0.1), omit replaces and skipRange to avoid OLM catalog validation errors.
+# Keep the default candidate's upgrade edge in the catalog.
 .PHONY: add_channel_entry_for_the_bundle
 add_channel_entry_for_the_bundle:
 	@for channel in $(shell echo ${CHANNELS} | tr ',' ' '); do \
@@ -426,10 +422,10 @@ add_channel_entry_for_the_bundle:
 		echo "entries:" >> ${CATALOG_INDEX}; \
 		echo "  - name: ${OPERATOR_NAME}.v${VERSION}" >> ${CATALOG_INDEX}; \
 		\
-		if [ -n "${PREVIOUS_VERSION}" ] && [ "${VERSION}" != "${DEFAULT_VERSION}" ] && [ "${PREVIOUS_VERSION}" != "${DEFAULT_VERSION}" ]; then \
+		if [ -n "${PREVIOUS_VERSION}" ]; then \
 			echo "    replaces: ${OPERATOR_NAME}.v${PREVIOUS_VERSION}" >> ${CATALOG_INDEX}; \
 		fi; \
-		if [ -n "${SKIP_RANGE_LOWER}" ] && [ "${VERSION}" != "${DEFAULT_VERSION}" ] && [ "${VERSION}" != "${SKIP_RANGE_LOWER}" ]; then \
+		if [ -n "${SKIP_RANGE_LOWER}" ] && [ "${VERSION}" != "${SKIP_RANGE_LOWER}" ]; then \
 			if ! printf '%s\n' "${SKIP_RANGE_LOWER}" "${VERSION}" | sort -V -C 2>/dev/null; then \
 				echo "Error: VERSION (${VERSION}) must be greater than SKIP_RANGE_LOWER (${SKIP_RANGE_LOWER})"; \
 				exit 1; \

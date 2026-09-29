@@ -1,0 +1,63 @@
+name: Kind E2E
+
+on:
+  pull_request:
+  push:
+    branches: [main, 'release-*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  kind-e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      TOOLS_DIR: ${{ github.workspace }}/.tools
+      E2E_KIND_OUTPUT_DIR: ${{ github.workspace }}/.tests/kind-e2e
+      CONTAINER_TOOL: docker
+      OPERATOR_NS: openshift-workload-availability
+    steps:
+      - name: Checkout MDR
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Install Kind
+        run: go install sigs.k8s.io/kind@v0.33.0
+
+      - name: Create cluster, fixtures, and OLM deployment
+        run: |
+          mkdir -p .tests
+          bash hack/local-run.sh setup 2>&1 | tee .tests/setup.log
+
+      - name: Run MDR E2E with supervised simulator
+        run: bash hack/local-run.sh test
+
+      - name: Collect diagnostics
+        if: always()
+        run: bash hack/local-run.sh collect
+
+      - name: Upload diagnostics before teardown
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kind-e2e
+          include-hidden-files: true
+          if-no-files-found: warn
+          path: |
+            .tests/setup.log
+            .tests/kind-e2e/**
+            !.tests/kind-e2e/kubeconfig
+            !.tests/kind-e2e/mdr-e2e.test
+            !.tests/kind-e2e/build/**
+
+      - name: Tear down cluster
+        if: always()
+        run: bash hack/local-run.sh teardown

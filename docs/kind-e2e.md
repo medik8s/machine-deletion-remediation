@@ -11,7 +11,8 @@ suite is outside this workflow.
 ## Run locally
 
 Requirements: Podman or Docker, Kind, kubectl, Python 3, and Go matching `go.mod`.
-CI uses Kind v0.33.0; the simulator follows that version's worker provisioning.
+CI uses the runner's preinstalled Kind. The simulator follows Kind v0.33.0's
+worker provisioning, which the tools Machine API smoke workflow checks.
 Set `TOOLS_DIR` to use a specific shared-tools checkout. Podman is the default;
 use `CONTAINER_TOOL=docker` for Docker. Each prepared fixture supports one MDR
 replacement. The standard operator image is built
@@ -20,9 +21,13 @@ The Kind overlay keeps the operator's non-root security settings and uses a
 256 MiB memory limit to allow emulated execution on arm64 hosts.
 
 Like SBR's local runner, this runner uses a local `../tools` checkout (including
-uncommitted changes), or lets `make dev-setup` download tools into `.tools` when
-no local checkout exists. It starts the shared watcher directly from the resolved
-tools directory, saves its PID, and stops that process on exit. To run:
+uncommitted changes), or lets the shared dev targets download tools into `.tools`
+when no local checkout exists. It uses the same setup, OLM deployment, readiness,
+test, and teardown targets as CI. Both start the watcher script directly in the
+background, check its status if it has already exited, and stop it and its child
+processes when tests finish. No separate test compilation is needed.
+`make e2e-test` is available for running only the Go tests against an already
+prepared cluster. To run:
 
 ```bash
 CONTAINER_TOOL=podman bash hack/local-run.sh all
@@ -33,9 +38,10 @@ The runner follows the shared tools defaults: cluster `medik8s-dev`, registry
 For OLM, it uses operator namespace `openshift-workload-availability`; artifacts
 go to a unique output directory `.tests/kind-e2e.XXXXXX`, printed by setup.
 Override these with `MEDIK8S_CLUSTER_NAME`,
-`MEDIK8S_REGISTRY_NAME`, `MEDIK8S_REGISTRY_PORT`, `OPERATOR_NS`, and
+`MEDIK8S_REGISTRY_NAME`, `MEDIK8S_REGISTRY_PORT`, `OPERATOR_NAMESPACE` (or `OPERATOR_NS`), and
 `E2E_KIND_OUTPUT_DIR` (absolute path). It uses an isolated kubeconfig in the output
-directory. Setup reuses an existing Kind cluster and registry. A fresh output
+directory. If both namespace variables are set, they must match. Setup reuses an
+existing Kind cluster and registry. A fresh output
 directory is created automatically for each run; an existing MDR fixture is rejected. The fixture
 requires one Ready control plane and at least two Ready workers. Changing only
 the output directory does not reset an already-used fixture; another MDR run
@@ -46,8 +52,9 @@ A rejected output directory is left untouched, and that invocation does not
 collect diagnostics or tear down a cluster. If setup fails before creating the
 cluster, collection skips Kind log export; check the first setup error.
 
-The all-in-one command collects diagnostics and removes a cluster it created
-on exit. It leaves a pre-existing cluster intact. To keep a newly created cluster
+The all-in-one command collects diagnostics and uses `make dev-teardown` to
+remove a cluster it created on exit. It preserves a pre-existing registry with
+`KEEP_REGISTRY=true` and leaves a pre-existing cluster intact. To keep a newly created cluster
 for other operators, run the phases separately and omit teardown. Keep the same
 environment overrides for every phase, including an explicit output directory:
 
@@ -67,9 +74,9 @@ Inspect the printed output directory before teardown. It contains watcher/test
 logs, JUnit, fixture identities in the watcher log, network-probe logs,
 Machines/MachineSet/MDR/Node/event and OLM dumps, operator logs, container
 listings and inspections. It also holds the isolated
-kubeconfig and an `owned-cluster` cleanup marker when setup creates the cluster;
-these are not watcher coordination files. Generated images/bundles use the standard Dockerfile and an
-isolated build directory; release bundle files are not regenerated.
+kubeconfig and ownership markers for a cluster or registry created by setup;
+these are not watcher coordination files. Generated images and bundles use the
+same build targets and checkout files as CI.
 
 
 ## Lifecycle and assertions
@@ -105,18 +112,41 @@ the existing non-BareMetal assertion.
 
 [The GitHub workflow](../.github/workflows/kind-e2e.yaml) runs for pull requests,
 main/release branch pushes, and manual dispatch on Ubuntu 24.04. Go comes from
-`go.mod`. CI calls the same `setup`, `test`, `collect`, and `teardown` phases as local use.
-It explicitly sets `E2E_KIND_OUTPUT_DIR` to `.tests/kind-e2e` for all phases.
-Diagnostics collection and upload run even on failure, before cluster teardown.
-The uploaded artifact excludes the kubeconfig, compiled test binary, and build
-directory.
+`go.mod`. CI and the local runner invoke the same Make targets:
+
+1. `make dev-olm-operator-sdk` installs the SDK used for OLM setup and deployment.
+2. `SETUP_MDR_MOCK=true make dev-setup` creates the cluster, registry, and mock
+   Machine API fixtures, then installs cert-manager and OLM. `MDR_CRD_DIR` points
+   to this repo's vendored Machine API CRDs. Setup calls `kind_mdr.py prepare`,
+   which applies both CRDs and waits for them to be established before creating
+   the MachineSet and Machine fixtures.
+3. `make dev-olm-deploy` builds and deploys MDR through the shared OLM targets.
+4. `make dev-wait` checks deployment readiness.
+5. Both start `kind-reboot-watcher.sh --mode mdr --once` directly in the
+   background in a separate process group before invoking `make e2e-test`
+   with `E2E_KIND=true`. The watcher waits indefinitely for a deletion request;
+   replacement still has a fifteen-minute deadline. When tests finish, the caller
+   checks the status of an already-exited watcher and stops any remaining
+   watcher and child processes. `e2e-test` only runs Go tests; `TEST_OPS`
+   accepts additional Go test or Ginkgo options.
+6. `make dev-ci-debug` and resource/log dumps collect diagnostics, then
+   `make dev-teardown` cleans up. CI uploads diagnostics before teardown;
+   local `all` keeps them in the output directory and checks resource ownership
+   before teardown.
+
+CI sets `E2E_KIND_OUTPUT_DIR` to `.tests/kind-e2e` and keeps its kubeconfig there.
+Diagnostics collection and upload run even on failure, before cleanup. The
+uploaded artifact excludes the kubeconfig.
+`OPERATOR_NAMESPACE` selects the OLM namespace; `OPERATOR_NS` selects the suite's
+namespace. Both use `openshift-workload-availability` in CI.
 
 The [Kind overlay](../config/kind-e2e/kustomization.yaml) places MDR on the control
 plane with its existing non-root security settings and a 256 MiB memory limit.
-The runner generates and validates its Kind bundle under the output directory;
-release artifacts remain separate. `make bundle` still defaults to
-`MANIFESTS_DIR=config/manifests`, with `MANIFESTS_DIR` available to select an
-overlay; use the runner for the isolated Kind output.
+Both paths build and push the operator and bundle using their Kind registry tags.
+They select the overlay with
+`MANIFESTS_DIR=config/kind-e2e`; the shared OLM build invokes
+MDR's normal bundle targets. This regenerates the checkout's bundle files.
+`make bundle` still defaults to `MANIFESTS_DIR=config/manifests`.
 
-Outside Kind, `make test-e2e` retains its Machine API/Infrastructure lookup.
+Outside Kind, `make e2e-test` retains its Machine API/Infrastructure lookup.
 `OPERATOR_NS` can override the existing `openshift-operators` namespace default.

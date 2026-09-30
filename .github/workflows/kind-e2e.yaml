@@ -13,11 +13,25 @@ jobs:
   kind-e2e:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
     env:
       TOOLS_DIR: ${{ github.workspace }}/.tools
-      E2E_KIND_OUTPUT_DIR: ${{ github.workspace }}/.tests/kind-e2e
+      MEDIK8S_CLUSTER_NAME: medik8s-ci
       CONTAINER_TOOL: docker
+      KIND_EXPERIMENTAL_PROVIDER: docker
+      MEDIK8S_REGISTRY_NAME: kind-registry
+      MEDIK8S_REGISTRY_PORT: "5000"
+      DEV_REGISTRY: registry
+      DEV_OLM_OPERATOR_SDK: ${{ github.workspace }}/bin/dev-olm/operator-sdk
+      MANIFESTS_DIR: config/kind-e2e
+      OPERATOR_NAMESPACE: openshift-workload-availability
       OPERATOR_NS: openshift-workload-availability
+      E2E_KIND: "true"
+      E2E_KIND_OUTPUT_DIR: ${{ github.workspace }}/.tests/kind-e2e
+      KUBECONFIG: ${{ github.workspace }}/.tests/kind-e2e/kubeconfig
+      MDR_CRD_DIR: ${{ github.workspace }}/vendor/github.com/openshift/api/machine/v1beta1/zz_generated.crd-manifests
     steps:
       - name: Checkout MDR
         uses: actions/checkout@v6
@@ -29,20 +43,48 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Install Kind
-        run: go install sigs.k8s.io/kind@v0.33.0
-
-      - name: Create cluster, fixtures, and OLM deployment
+      - name: Install operator-sdk
         run: |
-          mkdir -p .tests
-          bash hack/local-run.sh setup 2>&1 | tee .tests/setup.log
+          make dev-olm-operator-sdk
+          echo "${GITHUB_WORKSPACE}/bin/dev-olm" >> "${GITHUB_PATH}"
+
+      - name: Create Kind cluster with registry, OLM, and mock Machine API
+        env:
+          SETUP_MDR_MOCK: "true"
+        run: |
+          mkdir -p "${E2E_KIND_OUTPUT_DIR}"
+          make dev-setup 2>&1 | tee "${E2E_KIND_OUTPUT_DIR}/setup.log"
+
+      - name: Build and deploy MDR through OLM
+        run: make dev-olm-deploy OPERATOR_SDK="${DEV_OLM_OPERATOR_SDK}"
+
+      - name: Wait for operator readiness
+        run: make dev-wait
 
       - name: Run MDR E2E with supervised simulator
-        run: bash hack/local-run.sh test
+        timeout-minutes: 35
+        run: |
+          setsid "${TOOLS_DIR}/dev/kind-reboot-watcher.sh" --mode mdr --once --name "${MEDIK8S_CLUSTER_NAME}" \
+            > "${E2E_KIND_OUTPUT_DIR}/watcher.log" 2>&1 &
+          watcher_pid=$!
+          trap 'kill "${watcher_pid}" 2>/dev/null || true; kill -- "-${watcher_pid}" 2>/dev/null || true; wait "${watcher_pid}" 2>/dev/null || true' EXIT
+          make e2e-test TEST_OPS="-ginkgo.junit-report=${E2E_KIND_OUTPUT_DIR}/junit.xml" \
+            2>&1 | tee "${E2E_KIND_OUTPUT_DIR}/e2e.log"
+          if ! kill -0 "${watcher_pid}" 2>/dev/null; then
+            wait "${watcher_pid}"
+          fi
 
       - name: Collect diagnostics
         if: always()
-        run: bash hack/local-run.sh collect
+        run: |
+          mkdir -p "${E2E_KIND_OUTPUT_DIR}"
+          make dev-ci-debug > "${E2E_KIND_OUTPUT_DIR}/debug.log" 2>&1 || true
+          for resource in machines.machine.openshift.io machinesets.machine.openshift.io machinedeletionremediations nodes pods events csv subscriptions installplans catalogsources operatorgroups; do
+            kubectl --request-timeout=15s get "${resource}" -A -o yaml > "${E2E_KIND_OUTPUT_DIR}/${resource}.yaml" 2>&1 || true
+          done
+          kubectl --request-timeout=15s logs -n "${OPERATOR_NAMESPACE}" -l control-plane=controller-manager --all-containers --tail=1000 > "${E2E_KIND_OUTPUT_DIR}/operator.log" 2>&1 || true
+          kubectl --request-timeout=15s logs -n kind-mdr-machines replacement-network > "${E2E_KIND_OUTPUT_DIR}/network.log" 2>&1 || true
+          docker ps -a --no-trunc --filter "label=io.x-k8s.kind.cluster=${MEDIK8S_CLUSTER_NAME}" > "${E2E_KIND_OUTPUT_DIR}/containers.txt" 2>&1 || true
 
       - name: Upload diagnostics before teardown
         if: always()
@@ -52,12 +94,9 @@ jobs:
           include-hidden-files: true
           if-no-files-found: warn
           path: |
-            .tests/setup.log
             .tests/kind-e2e/**
             !.tests/kind-e2e/kubeconfig
-            !.tests/kind-e2e/mdr-e2e.test
-            !.tests/kind-e2e/build/**
 
       - name: Tear down cluster
         if: always()
-        run: bash hack/local-run.sh teardown
+        run: make dev-teardown

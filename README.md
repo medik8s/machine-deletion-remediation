@@ -15,24 +15,6 @@ This operator conforms to the External Remediation of [NodeHealthCheck](https://
 This is basically a specific use case of an External Remediation of [NodeHealthCheck](https://github.com/medik8s/node-healthcheck-operator#readme).
 In order to set up: make sure that Node Health Check is running, Machine-deletion-remediation controller exists and then create the necessary CRs.
 
-### Deploying the current source to OpenShift
-
-For PR or branch testing, build the operator with the pinned source-deployment
-toolchain, push temporary images to `ttl.sh`, and install the generated OLM
-bundle with operator-sdk:
-
-```bash
-make dev-olm-deploy
-```
-
-The temporary images expire after two hours by default. Override the duration
-and deployment namespace when needed, for example:
-
-```bash
-TTL_SH_TTL=4h DEV_OLM_OPERATOR_NAMESPACE=openshift-workload-availability make dev-olm-deploy
-make dev-olm-undeploy
-```
-
 ## Example CRs
 An example MDR template object.
 ```yaml

@@ -121,7 +121,12 @@ GOBIN=$(shell go env GOBIN)
 endif
 
 # CONTAINER_TOOL defines the container tool to be used for building images.
-CONTAINER_TOOL ?= podman
+CONTAINER_TOOL ?= $(shell \
+	if command -v podman >/dev/null 2>&1; then echo podman; \
+	elif command -v docker >/dev/null 2>&1; then echo docker; \
+	else echo podman; \
+	fi \
+)
 export CONTAINER_TOOL
 
 .PHONY: all
@@ -378,12 +383,13 @@ bundle-validate: operator-sdk ## Validate the bundle directory with additional v
 	$(OPERATOR_SDK) bundle validate ./bundle --select-optional suite=operatorframework
 
 .PHONY: bundle-build
-bundle-build: bundle bundle-update ## Build the bundle image.
+bundle-build: bundle ## Build the bundle image.
+	$(MAKE) bundle-update
 	$(CONTAINER_TOOL) build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 .PHONY: bundle-push
 bundle-push: ## Push the bundle image.
-	$(MAKE) docker-push IMG=$(BUNDLE_IMG)
+	$(CONTAINER_TOOL) push $(BUNDLE_IMG)
 
 .PHONY: bundle-run
 OPERATOR_NAMESPACE ?= openshift-workload-availability
@@ -450,7 +456,7 @@ catalog-build: opm ## Build a file-based catalog image.
 
 .PHONY: catalog-push
 catalog-push: ## Push a catalog image.
-	$(MAKE) docker-push IMG=$(CATALOG_IMG)
+	$(CONTAINER_TOOL) push $(CATALOG_IMG)
 
 ##@ Targets used by CI
 

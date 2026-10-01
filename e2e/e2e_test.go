@@ -20,7 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/medik8s/machine-deletion-remediation/api/v1alpha1"
+	"github.com/medik8s/machine-deletion-remediation/v5/api/v1alpha1"
 )
 
 const (

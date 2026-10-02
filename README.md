@@ -15,6 +15,13 @@ This operator conforms to the External Remediation of [NodeHealthCheck](https://
 This is basically a specific use case of an External Remediation of [NodeHealthCheck](https://github.com/medik8s/node-healthcheck-operator#readme).
 In order to set up: make sure that Node Health Check is running, Machine-deletion-remediation controller exists and then create the necessary CRs.
 
+## Kind E2E testing
+
+Run `bash hack/local-run.sh all` to test MDR through OLM using Podman and
+simulated Machine replacement on Kind. The test creates an MDR directly and
+does not deploy NHC. See the [Kind E2E guide](docs/kind-e2e.md) for prerequisites,
+cluster reuse, individual phases, and diagnostics.
+
 ## Example CRs
 An example MDR template object.
 ```yaml

@@ -24,4 +24,7 @@ bin
 
 catalog/
 catalog.Dockerfile
+.tests/
 .tools/
+.vscode
+.codex

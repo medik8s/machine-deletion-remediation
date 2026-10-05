@@ -37,6 +37,8 @@ YQ_VERSION = v4.53.2
 
 BLUE_ICON_PATH = ./config/assets/medik8s_blue_icon.png
 
+CONTAINER_TOOL ?= podman
+
 # VERSION defines the project version for the bundle. 
 # Update this value when you upgrade the version of your project.
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
@@ -481,7 +483,6 @@ ifeq ($(wildcard $(DEV_MK)),)
   DEV_MK := $(TOOLS_DIR)/dev/dev.mk
 endif
 -include $(DEV_MK)
-CONTAINER_TOOL ?= podman
 ifeq ($(wildcard $(DEV_MK)),)
 dev-%:
 	@echo "Downloading medik8s/tools into $(TOOLS_DIR)..."

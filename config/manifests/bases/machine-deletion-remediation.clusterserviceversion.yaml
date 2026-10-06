@@ -14,7 +14,7 @@ metadata:
     operatorframework.io/suggested-namespace-template: '{"kind":"Namespace","apiVersion":"v1","metadata":{"name":"openshift-workload-availability","annotations":{"openshift.io/node-selector":""}}}'
     repository: https://github.com/medik8s/machine-deletion-remediation
     support: Medik8s
-  name: machine-deletion-remediation.v0.0.0
+  name: machine-deletion-remediation.v5.8.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -106,4 +106,4 @@ spec:
     name: Medik8s
     url: https://github.com/medik8s
   replaces: machine-deletion-remediation.v0.7.1
-  version: 0.0.0
+  version: 5.8.0

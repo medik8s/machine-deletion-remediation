@@ -1,13 +1,13 @@
 #!/bin/bash -ex
 DEST_DIR=$1
 
-GIT_VERSION=$(git describe --always --tags || true)
-VERSION=${CI_VERSION:-${GIT_VERSION}}
+VERSION=${VERSION:-$(sed -n 's/^DEFAULT_VERSION := //p' Makefile)}
+: "${VERSION:?Makefile must define DEFAULT_VERSION}"
 GIT_COMMIT=$(git rev-list -1 HEAD || true)
-COMMIT=${CI_COMMIT:-${GIT_COMMIT}}
+COMMIT=${CI_UPSTREAM_COMMIT:-${GIT_COMMIT}}
 BUILD_DATE=$(date --utc -Iseconds)
 
-mkdir -p bin
+mkdir -p "${DEST_DIR}"
 
 LDFLAGS_VALUE="-X github.com/medik8s/machine-deletion-remediation/v5/version.Version=${VERSION} "
 LDFLAGS_VALUE+="-X github.com/medik8s/machine-deletion-remediation/v5/version.GitCommit=${COMMIT} "

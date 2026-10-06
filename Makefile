@@ -37,13 +37,11 @@ YQ_VERSION = v4.53.2
 
 BLUE_ICON_PATH = ./config/assets/medik8s_blue_icon.png
 
-CONTAINER_TOOL ?= podman
-
 # VERSION defines the project version for the bundle. 
 # Update this value when you upgrade the version of your project.
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
-# - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
-# - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
+# - use the VERSION as arg of the bundle target (e.g make bundle VERSION=5.8.1)
+# - use environment variables to overwrite this value (e.g export VERSION=5.8.1)
 DEFAULT_VERSION := 5.8.0
 VERSION ?= $(DEFAULT_VERSION)
 PREVIOUS_VERSION ?= 0.7.1
@@ -120,12 +118,7 @@ GOBIN=$(shell go env GOBIN)
 endif
 
 # CONTAINER_TOOL defines the container tool to be used for building images.
-CONTAINER_TOOL ?= $(shell \
-	if command -v podman >/dev/null 2>&1; then echo podman; \
-	elif command -v docker >/dev/null 2>&1; then echo docker; \
-	else echo podman; \
-	fi \
-)
+CONTAINER_TOOL ?= podman
 export CONTAINER_TOOL
 
 .PHONY: all
@@ -219,7 +212,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 
 .PHONY: docker-build
 docker-build: test-no-verify-changes ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build -t ${IMG} .
+	$(CONTAINER_TOOL) build --build-arg OPERATOR_VERSION=$(VERSION) -t ${IMG} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
@@ -345,6 +338,7 @@ bundle-update: verify-previous-version ## Update CSV fields and validate the bun
 		-e "s|createdAt: .*|createdAt: \"$$(date '+%Y-%m-%d %T')\"|;" \
 		-e "s|base64data:.*|base64data: $$ICON_BASE64|;" \
 		-e "s|replaces: .*|replaces: machine-deletion-remediation.v${PREVIOUS_VERSION}|;" \
+		-e "s|olm.skipRange: .*|olm.skipRange: '>=${SKIP_RANGE_LOWER} <${VERSION}'|;" \
 		"${CSV}" > "$$tmp"; \
 	chmod 644 "$$tmp"; \
 	mv "$$tmp" "${CSV}"

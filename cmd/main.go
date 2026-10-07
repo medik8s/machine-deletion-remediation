@@ -48,9 +48,9 @@ import (
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	openshifttls "github.com/openshift/controller-runtime-common/pkg/tls"
 
-	appv1alpha1 "github.com/medik8s/machine-deletion-remediation/api/v1alpha1"
-	"github.com/medik8s/machine-deletion-remediation/internal/controller"
-	"github.com/medik8s/machine-deletion-remediation/version"
+	appv1alpha1 "github.com/medik8s/machine-deletion-remediation/v5/api/v1alpha1"
+	"github.com/medik8s/machine-deletion-remediation/v5/internal/controller"
+	"github.com/medik8s/machine-deletion-remediation/v5/version"
 	//+kubebuilder:scaffold:imports
 )
 

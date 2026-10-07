@@ -1,4 +1,4 @@
-module github.com/medik8s/machine-deletion-remediation
+module github.com/medik8s/machine-deletion-remediation/v5
 
 // min version, matches k8s 1.34.7
 go 1.26.0

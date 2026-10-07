@@ -34,4 +34,4 @@ jobs:
           registry: quay.io
 
       - name: Build and push current-version CSV and images
-        run: make bundle container-build container-push
+        run: make bundle container-build container-push IMAGE_TAG=latest

@@ -27,7 +27,8 @@ test, and teardown targets as CI. Both start the watcher script directly in the
 background, check its status if it has already exited, and stop it and its child
 processes when tests finish. No separate test compilation is needed.
 `make e2e-test` is available for running only the Go tests against an already
-prepared cluster. To run:
+prepared cluster. `make test-e2e` remains a compatibility alias for the same
+target. To run:
 
 ```bash
 CONTAINER_TOOL=podman bash hack/local-run.sh all

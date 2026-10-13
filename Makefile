@@ -190,6 +190,9 @@ e2e-test: ## Run end to end tests against an already deployed operator
 	@test -n "${KUBECONFIG}" -o -r ${HOME}/.kube/config || (echo "Failed to find kubeconfig in ~/.kube/config or no KUBECONFIG set"; exit 1)
 	go test ./e2e -coverprofile cover.out -v -timeout 25m -ginkgo.vv  ${TEST_OPS}
 
+.PHONY: test-e2e
+test-e2e: e2e-test
+
 ##@ Build
 
 .PHONY: manager

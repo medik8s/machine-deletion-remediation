@@ -1,10 +1,11 @@
 name: Kind E2E
 
 on:
-  pull_request:
   push:
-    branches: [main, 'release-*']
-  workflow_dispatch:
+    branches: ['main*', 'medik8s-*', 'release-*']
+  pull_request:
+    branches: ['**']
+  workflow_dispatch: {}
 
 permissions:
   contents: read

@@ -21,3 +21,7 @@ bin
 *.swp
 *.swo
 *~
+.tests/
+.tools/
+.vscode
+.codex

@@ -3,6 +3,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -24,11 +25,10 @@ import (
 )
 
 const (
-	machineDeletionRemediationNamespace = "openshift-operators"
-	machineAnnotationOpenshift          = "machine.openshift.io/machine"
-	machineAPIVersion                   = "machine.openshift.io/v1beta1"
-	machineKind                         = "Machine"
-	workerLabelName                     = "node-role.kubernetes.io/worker"
+	machineAnnotationOpenshift = "machine.openshift.io/machine"
+	machineAPIVersion          = "machine.openshift.io/v1beta1"
+	machineKind                = "Machine"
+	workerLabelName            = "node-role.kubernetes.io/worker"
 )
 
 const (
@@ -40,6 +40,13 @@ const (
 )
 
 var mdr *v1alpha1.MachineDeletionRemediation
+
+var machineDeletionRemediationNamespace = func() string {
+	if namespace := os.Getenv("OPERATOR_NS"); namespace != "" {
+		return namespace
+	}
+	return "openshift-operators"
+}()
 
 var _ = Describe("E2E tests", func() {
 	Context("Machine Deletion Remediation", func() {
@@ -199,6 +206,9 @@ func verifyConditionMatches(conditionType string, conditionStatus metav1.Conditi
 }
 
 func getPlatform(c client.Client) (string, error) {
+	if os.Getenv("E2E_KIND") == "true" {
+		return "Kind", nil
+	}
 
 	cluster := &unstructured.Unstructured{}
 	cluster.SetGroupVersionKind(schema.GroupVersionKind{

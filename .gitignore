@@ -28,3 +28,4 @@ catalog.Dockerfile
 .tools/
 .vscode
 .codex
+.DS_Store

@@ -35,7 +35,9 @@ SORT_IMPORTS_VERSION = v0.3.0
 YQ_API_VERSION = v4
 YQ_VERSION = v4.53.2
 
-BLUE_ICON_PATH = "./config/assets/medik8s_blue_icon.png"
+BLUE_ICON_PATH = ./config/assets/medik8s_blue_icon.png
+
+CONTAINER_TOOL ?= podman
 
 # VERSION defines the project version for the bundle. 
 # Update this value when you upgrade the version of your project.
@@ -71,6 +73,7 @@ ifneq ($(origin DEFAULT_CHANNEL), undefined)
 BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
 endif
 BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
+MANIFESTS_DIR ?= config/manifests
 
 # IMAGE_REGISTRY used to indicate the registery/group for the operator and bundle
 IMAGE_REGISTRY ?= quay.io/medik8s
@@ -172,7 +175,7 @@ verify-no-changes: bundle-reset ## verify no there are no un-staged changes and 
 
 # Run tests
 # Use TEST_OPS to pass further options to `go test` (e.g. verbosity and/or -ginkgo.focus)
-export TEST_OPS ?= ""
+export TEST_OPS ?=
 .PHONY: test
 test: test-no-verify-changes verify-no-changes ## Run tests and verify no changes
 
@@ -181,11 +184,14 @@ test-no-verify-changes: go-verify manifests generate fmt vet test-imports envtes
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(PROJECT_DIR)/testbin)" \
 	go test ./internal/controller/... -coverprofile cover.out ${TEST_OPS}
 
-.PHONY: test-e2e
-test-e2e: ## Run end to end tests
+.PHONY: e2e-test
+e2e-test: ## Run end to end tests against an already deployed operator
 	# KUBECONFIG must be set to the cluster, and MDR needs to be deployed already
 	@test -n "${KUBECONFIG}" -o -r ${HOME}/.kube/config || (echo "Failed to find kubeconfig in ~/.kube/config or no KUBECONFIG set"; exit 1)
 	go test ./e2e -coverprofile cover.out -v -timeout 25m -ginkgo.vv  ${TEST_OPS}
+
+.PHONY: test-e2e
+test-e2e: e2e-test
 
 ##@ Build
 
@@ -304,20 +310,30 @@ endef
 bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metadata, then validate generated files.
 	$(OPERATOR_SDK) generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
-	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+	$(KUSTOMIZE) build $(MANIFESTS_DIR) | $(OPERATOR_SDK) generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
 	$(MAKE) bundle-validate
 
+.PHONY: bundle-k8s
+bundle-k8s: bundle ## Alias for bundle target
+
 ## Some addition to bundle creation in the bundle
-DEFAULT_ICON_BASE64 := $(shell base64 --wrap=0 ${BLUE_ICON_PATH})
+DEFAULT_ICON_BASE64 := $(shell base64 < "${BLUE_ICON_PATH}" | tr -d '\n')
 export ICON_BASE64 ?= ${DEFAULT_ICON_BASE64}
-export CSV="./bundle/manifests/$(OPERATOR_NAME).clusterserviceversion.yaml"
+export CSV=./bundle/manifests/$(OPERATOR_NAME).clusterserviceversion.yaml
 
 .PHONY: bundle-update
 bundle-update: verify-previous-version ## Update CSV fields and validate the bundle directory
-	sed -r -i "s|containerImage: .*|containerImage: $(IMG)|;" ${CSV}
-	sed -r -i "s|createdAt: .*|createdAt: \"`date '+%Y-%m-%d %T'`\"|;" ${CSV}
-	sed -r -i "s|base64data:.*|base64data: ${ICON_BASE64}|;" ${CSV}
-	sed -r -i "s|replaces: .*|replaces: machine-deletion-remediation.v${PREVIOUS_VERSION}|;" ${CSV}
+	@set -e; \
+	tmp=$$(mktemp "${CSV}.XXXXXX"); \
+	trap 'rm -f "$$tmp"' EXIT; \
+	image=$$(printf '%s' "$$IMG" | sed 's/[\\&|]/\\&/g'); \
+	sed -e "s|containerImage: .*|containerImage: $$image|;" \
+		-e "s|createdAt: .*|createdAt: \"$$(date '+%Y-%m-%d %T')\"|;" \
+		-e "s|base64data:.*|base64data: $$ICON_BASE64|;" \
+		-e "s|replaces: .*|replaces: machine-deletion-remediation.v${PREVIOUS_VERSION}|;" \
+		"${CSV}" > "$$tmp"; \
+	chmod 644 "$$tmp"; \
+	mv "$$tmp" "${CSV}"
 	$(MAKE) bundle-validate
 
 .PHONY: bundle-reset
@@ -363,7 +379,7 @@ bundle-validate: operator-sdk ## Validate the bundle directory with additional v
 
 .PHONY: bundle-build
 bundle-build: bundle bundle-update ## Build the bundle image.
-	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
+	$(CONTAINER_TOOL) build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 .PHONY: bundle-push
 bundle-push: ## Push the bundle image.
@@ -403,7 +419,7 @@ catalog-build: opm ## Build a file-based catalog image.
 	$(OPM) init ${OPERATOR_NAME} \
 		--default-channel=${CHANNELS} \
 		--description=./README.md \
-		--icon=${BLUE_ICON_PATH} \
+		--icon="${BLUE_ICON_PATH}" \
 		--output yaml \
 		> ${CATALOG_INDEX}
 	$(OPM) render ${BUNDLE_IMG} --output yaml >> ${CATALOG_INDEX}
@@ -426,3 +442,35 @@ container-build: ## Build containers
 .PHONY: container-push
 container-push: ## Push containers (NOTE: catalog can't be built before bundle is pushed)
 	$(MAKE) docker-push bundle-push catalog-build catalog-push
+
+# Shared dev environment
+# Uses a local sibling checkout if available (e.g. ../tools),
+# otherwise downloads the tools repo into .tools/ on first dev-* target use.
+#
+# IMPORTANT: Do NOT use $(shell git clone ...) here — $(shell) executes at
+# Makefile parse time, so any make invocation (make build, make test, make help)
+# would trigger a git clone. The dev-% fallback rule below is lazy: the clone
+# only runs when a dev-* target is actually invoked.
+TOOLS_DIR ?= $(shell cd .. && pwd)/tools
+DEV_MK := $(TOOLS_DIR)/dev/dev.mk
+ifeq ($(wildcard $(DEV_MK)),)
+  TOOLS_DIR := $(shell pwd)/.tools
+  DEV_MK := $(TOOLS_DIR)/dev/dev.mk
+endif
+-include $(DEV_MK)
+ifeq ($(wildcard $(DEV_MK)),)
+dev-%:
+	@echo "Downloading medik8s/tools into $(TOOLS_DIR)..."
+	@if [ -d $(TOOLS_DIR) ]; then \
+		if [ -f $(TOOLS_DIR)/.managed-by-makefile ]; then \
+			echo "  Removing stale $(TOOLS_DIR)..."; rm -rf $(TOOLS_DIR); \
+		else \
+			echo "Error: $(TOOLS_DIR) exists but was not created by this Makefile (missing .managed-by-makefile sentinel)."; \
+			echo "       Remove it manually or set TOOLS_DIR to a valid medik8s/tools checkout."; exit 1; \
+		fi; \
+	fi
+	@git clone --depth 1 https://github.com/medik8s/tools.git $(TOOLS_DIR)
+	@touch $(TOOLS_DIR)/.managed-by-makefile
+	@test -f $(DEV_MK) || { echo "Error: $(DEV_MK) not found after clone."; exit 1; }
+	@$(MAKE) $@
+endif

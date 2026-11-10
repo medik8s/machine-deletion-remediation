@@ -223,7 +223,6 @@ spec:
                   httpGet:
                     path: /healthz
                     port: 8081
-                  initialDelaySeconds: 15
                   periodSeconds: 20
                 name: manager
                 ports:
@@ -249,6 +248,12 @@ spec:
                     drop:
                     - ALL
                   readOnlyRootFilesystem: true
+                startupProbe:
+                  failureThreshold: 12
+                  httpGet:
+                    path: /healthz
+                    port: 8081
+                  periodSeconds: 5
               securityContext:
                 runAsNonRoot: true
               serviceAccountName: machine-deletion-remediation-controller-manager

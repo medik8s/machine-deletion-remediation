@@ -3,6 +3,9 @@ SHELL := /bin/bash
 
 OPERATOR_NAME := machine-deletion-remediation
 
+# PACKAGE_NAME is the OLM package name
+PACKAGE_NAME ?= medik8s-$(OPERATOR_NAME)
+
 ## Tool versions
 # OPERATOR_SDK versions at https://github.com/operator-framework/operator-sdk/releases
 # heads up: 1.37 is the last version which supports go/v3!
@@ -49,6 +52,9 @@ VERSION ?= $(DEFAULT_VERSION)
 PREVIOUS_VERSION ?= $(DEFAULT_PREVIOUS_VERSION)
 SKIP_RANGE_LOWER ?= $(DEFAULT_SKIP_RANGE_LOWER)
 export VERSION
+# NO_REPLACES omits the CSV / catalog "replaces" field for a clean-root release that has no
+# in-package predecessor
+NO_REPLACES ?= false
 
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "preview,fast,stable")
@@ -317,15 +323,15 @@ endef
 
 .PHONY: bundle
 bundle: verify-previous-version verify-skip-range ## Generate bundle manifests and metadata, then validate generated files.
-	@if [ -z "$(PREVIOUS_VERSION)" ]; then \
-		echo "Error: PREVIOUS_VERSION must be set"; \
+	@if [ -z "$(PREVIOUS_VERSION)" ] && [ "$(NO_REPLACES)" != "true" ]; then \
+		echo "Error: PREVIOUS_VERSION must be set (or set NO_REPLACES=true for a clean-root release)"; \
 		exit 1; \
 	fi
 	# Validate before starting generation, including under parallel Make.
 	$(MAKE) manifests kustomize operator-sdk
-	$(OPERATOR_SDK) generate kustomize manifests -q
+	$(OPERATOR_SDK) generate kustomize manifests -q --package $(PACKAGE_NAME)
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
-	$(KUSTOMIZE) build $(MANIFESTS_DIR) | $(OPERATOR_SDK) generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+	$(KUSTOMIZE) build $(MANIFESTS_DIR) | $(OPERATOR_SDK) generate bundle -q --overwrite --version $(VERSION) --package $(PACKAGE_NAME) $(BUNDLE_METADATA_OPTS)
 	$(MAKE) bundle-validate
 
 .PHONY: bundle-k8s
@@ -334,12 +340,12 @@ bundle-k8s: bundle ## Alias for bundle target
 ## Some addition to bundle creation in the bundle
 DEFAULT_ICON_BASE64 := $(shell base64 < "${BLUE_ICON_PATH}" | tr -d '\n')
 export ICON_BASE64 ?= ${DEFAULT_ICON_BASE64}
-export CSV=./bundle/manifests/$(OPERATOR_NAME).clusterserviceversion.yaml
+export CSV="./bundle/manifests/$(PACKAGE_NAME).clusterserviceversion.yaml"
 
 .PHONY: bundle-update
 bundle-update: verify-previous-version verify-skip-range ## Update CSV fields and validate the bundle directory
-	@if [ -z "$(PREVIOUS_VERSION)" ]; then \
-		echo "Error: PREVIOUS_VERSION must be set"; \
+	@if [ -z "$(PREVIOUS_VERSION)" ] && [ "$(NO_REPLACES)" != "true" ]; then \
+		echo "Error: PREVIOUS_VERSION must be set (or set NO_REPLACES=true for a clean-root release)"; \
 		exit 1; \
 	fi
 	@set -e; \
@@ -349,8 +355,13 @@ bundle-update: verify-previous-version verify-skip-range ## Update CSV fields an
 	sed -e "s|containerImage: .*|containerImage: $$image|;" \
 		-e "s|createdAt: .*|createdAt: \"$$(date '+%Y-%m-%d %T')\"|;" \
 		-e "s|base64data:.*|base64data: $$ICON_BASE64|;" \
-		-e "s|replaces: .*|replaces: machine-deletion-remediation.v${PREVIOUS_VERSION}|;" \
+		-e "/  replaces:.*/d" \
 		"${CSV}" > "$$tmp"; \
+	if [ "$(NO_REPLACES)" = "true" ]; then \
+		echo "NO_REPLACES=true: omitting replaces field (clean-root release)"; \
+	else \
+		sed -r -i "/  version: $(VERSION)/ a\\  replaces: $(PACKAGE_NAME).v$(PREVIOUS_VERSION)" "$$tmp"; \
+	fi; \
 	if [ -n "$(SKIP_RANGE_LOWER)" ]; then \
 		if grep -q '^    olm\.skipRange:' "$$tmp"; then \
 			sed -r -i "s|olm.skipRange: .*|olm.skipRange: '>=${SKIP_RANGE_LOWER} <${VERSION}'|;" "$$tmp"; \
@@ -366,10 +377,10 @@ bundle-update: verify-previous-version verify-skip-range ## Update CSV fields an
 
 .PHONY: bundle-reset
 bundle-reset: ## Revert all version or build date related changes
-	$(MAKE) bundle VERSION=$(DEFAULT_VERSION) IMAGE_TAG=v$(DEFAULT_VERSION) IMG=$(IMAGE_TAG_BASE)-operator:v$(DEFAULT_VERSION) PREVIOUS_VERSION=$(DEFAULT_PREVIOUS_VERSION) SKIP_RANGE_LOWER=$(DEFAULT_SKIP_RANGE_LOWER)
+	NO_REPLACES=true $(MAKE) bundle VERSION=$(DEFAULT_VERSION) IMAGE_TAG=v$(DEFAULT_VERSION) IMG=$(IMAGE_TAG_BASE)-operator:v$(DEFAULT_VERSION) PREVIOUS_VERSION=$(DEFAULT_PREVIOUS_VERSION) SKIP_RANGE_LOWER=$(DEFAULT_SKIP_RANGE_LOWER)
 	sed -r -i "s|createdAt: .*|createdAt: \"\"|;" ${CSV}
 	sed -r -i "s|base64data:.*|base64data: base64EncodedIcon|;" ${CSV}
-	sed -r -i "s|replaces: .*|replaces: machine-deletion-remediation.v$(DEFAULT_PREVIOUS_VERSION)|;" ${CSV}
+	sed -r -i "/  replaces:.*/d" ${CSV}
 	sed -r -i "s|olm.skipRange: .*|olm.skipRange: '>=$(DEFAULT_SKIP_RANGE_LOWER) <$(DEFAULT_VERSION)'|;" ${CSV}
 	$(MAKE) bundle-validate VERSION=$(DEFAULT_VERSION) IMAGE_TAG=v$(DEFAULT_VERSION) PREVIOUS_VERSION=$(DEFAULT_PREVIOUS_VERSION) SKIP_RANGE_LOWER=$(DEFAULT_SKIP_RANGE_LOWER)
 
@@ -436,7 +447,7 @@ bundle-run-update: operator-sdk ## Upgrade bundle image
 
 .PHONY: bundle-cleanup
 bundle-cleanup: operator-sdk ## Remove bundle installed via bundle-run
-	$(OPERATOR_SDK) -n $(OPERATOR_NAMESPACE) cleanup $(OPERATOR_NAME)
+	$(OPERATOR_SDK) -n $(OPERATOR_NAMESPACE) cleanup $(PACKAGE_NAME)
 
 # Build a file-based catalog image
 # https://docs.openshift.com/container-platform/4.14/operators/admin/olm-managing-custom-catalogs.html#olm-managing-custom-catalogs-fb
@@ -452,13 +463,13 @@ add_channel_entry_for_the_bundle: verify-previous-version verify-skip-range
 	@for channel in $(shell echo ${CHANNELS} | tr ',' ' '); do \
 		echo "---" >> ${CATALOG_INDEX}; \
 		echo "schema: olm.channel" >> ${CATALOG_INDEX}; \
-		echo "package: ${OPERATOR_NAME}" >> ${CATALOG_INDEX}; \
+		echo "package: ${PACKAGE_NAME}" >> ${CATALOG_INDEX}; \
 		echo "name: $$channel" >> ${CATALOG_INDEX}; \
 		echo "entries:" >> ${CATALOG_INDEX}; \
-		echo "  - name: ${OPERATOR_NAME}.v${VERSION}" >> ${CATALOG_INDEX}; \
+		echo "  - name: ${PACKAGE_NAME}.v${VERSION}" >> ${CATALOG_INDEX}; \
 		\
-		if [ -n "${PREVIOUS_VERSION}" ]; then \
-			echo "    replaces: ${OPERATOR_NAME}.v${PREVIOUS_VERSION}" >> ${CATALOG_INDEX}; \
+		if [ "${NO_REPLACES}" != "true" ] && [ -n "${PREVIOUS_VERSION}" ]; then \
+			echo "    replaces: ${PACKAGE_NAME}.v${PREVIOUS_VERSION}" >> ${CATALOG_INDEX}; \
 		fi; \
 		if [ -n "${SKIP_RANGE_LOWER}" ]; then \
 			echo "    skipRange: '>=${SKIP_RANGE_LOWER} <${VERSION}'" >> ${CATALOG_INDEX}; \
@@ -472,7 +483,7 @@ catalog-build: verify-previous-version verify-skip-range ## Build a file-based c
 	-rm -r ${CATALOG_DIR} ${CATALOG_DOCKERFILE}
 	@mkdir -p ${CATALOG_DIR}
 	$(OPM) generate dockerfile ${CATALOG_DIR}
-	$(OPM) init ${OPERATOR_NAME} \
+	$(OPM) init ${PACKAGE_NAME} \
 		--default-channel=${DEFAULT_CHANNEL} \
 		--description=./README.md \
 		--icon="${BLUE_ICON_PATH}" \

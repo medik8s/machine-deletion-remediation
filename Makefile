@@ -52,6 +52,9 @@ VERSION ?= $(DEFAULT_VERSION)
 PREVIOUS_VERSION ?= $(DEFAULT_PREVIOUS_VERSION)
 SKIP_RANGE_LOWER ?= $(DEFAULT_SKIP_RANGE_LOWER)
 export VERSION
+# NO_REPLACES omits the CSV / catalog "replaces" field for a clean-root release that has no
+# in-package predecessor
+NO_REPLACES ?= false
 
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "preview,fast,stable")
@@ -320,8 +323,8 @@ endef
 
 .PHONY: bundle
 bundle: verify-previous-version verify-skip-range ## Generate bundle manifests and metadata, then validate generated files.
-	@if [ -z "$(PREVIOUS_VERSION)" ]; then \
-		echo "Error: PREVIOUS_VERSION must be set"; \
+	@if [ -z "$(PREVIOUS_VERSION)" ] && [ "$(NO_REPLACES)" != "true" ]; then \
+		echo "Error: PREVIOUS_VERSION must be set (or set NO_REPLACES=true for a clean-root release)"; \
 		exit 1; \
 	fi
 	# Validate before starting generation, including under parallel Make.
@@ -341,8 +344,8 @@ export CSV="./bundle/manifests/$(PACKAGE_NAME).clusterserviceversion.yaml"
 
 .PHONY: bundle-update
 bundle-update: verify-previous-version verify-skip-range ## Update CSV fields and validate the bundle directory
-	@if [ -z "$(PREVIOUS_VERSION)" ]; then \
-		echo "Error: PREVIOUS_VERSION must be set"; \
+	@if [ -z "$(PREVIOUS_VERSION)" ] && [ "$(NO_REPLACES)" != "true" ]; then \
+		echo "Error: PREVIOUS_VERSION must be set (or set NO_REPLACES=true for a clean-root release)"; \
 		exit 1; \
 	fi
 	@set -e; \
@@ -352,8 +355,13 @@ bundle-update: verify-previous-version verify-skip-range ## Update CSV fields an
 	sed -e "s|containerImage: .*|containerImage: $$image|;" \
 		-e "s|createdAt: .*|createdAt: \"$$(date '+%Y-%m-%d %T')\"|;" \
 		-e "s|base64data:.*|base64data: $$ICON_BASE64|;" \
-		-e "s|replaces: .*|replaces: ${PACKAGE_NAME}.v${PREVIOUS_VERSION}|;" \
+		-e "/  replaces:.*/d" \
 		"${CSV}" > "$$tmp"; \
+	if [ "$(NO_REPLACES)" = "true" ]; then \
+		echo "NO_REPLACES=true: omitting replaces field (clean-root release)"; \
+	else \
+		sed -r -i "/  version: $(VERSION)/ a\\  replaces: $(PACKAGE_NAME).v$(PREVIOUS_VERSION)" "$$tmp"; \
+	fi; \
 	if [ -n "$(SKIP_RANGE_LOWER)" ]; then \
 		if grep -q '^    olm\.skipRange:' "$$tmp"; then \
 			sed -r -i "s|olm.skipRange: .*|olm.skipRange: '>=${SKIP_RANGE_LOWER} <${VERSION}'|;" "$$tmp"; \
@@ -369,10 +377,10 @@ bundle-update: verify-previous-version verify-skip-range ## Update CSV fields an
 
 .PHONY: bundle-reset
 bundle-reset: ## Revert all version or build date related changes
-	$(MAKE) bundle VERSION=$(DEFAULT_VERSION) IMAGE_TAG=v$(DEFAULT_VERSION) IMG=$(IMAGE_TAG_BASE)-operator:v$(DEFAULT_VERSION) PREVIOUS_VERSION=$(DEFAULT_PREVIOUS_VERSION) SKIP_RANGE_LOWER=$(DEFAULT_SKIP_RANGE_LOWER)
+	NO_REPLACES=true $(MAKE) bundle VERSION=$(DEFAULT_VERSION) IMAGE_TAG=v$(DEFAULT_VERSION) IMG=$(IMAGE_TAG_BASE)-operator:v$(DEFAULT_VERSION) PREVIOUS_VERSION=$(DEFAULT_PREVIOUS_VERSION) SKIP_RANGE_LOWER=$(DEFAULT_SKIP_RANGE_LOWER)
 	sed -r -i "s|createdAt: .*|createdAt: \"\"|;" ${CSV}
 	sed -r -i "s|base64data:.*|base64data: base64EncodedIcon|;" ${CSV}
-	sed -r -i "s|replaces: .*|replaces: $(PACKAGE_NAME).v$(DEFAULT_PREVIOUS_VERSION)|;" ${CSV}
+	sed -r -i "/  replaces:.*/d" ${CSV}
 	sed -r -i "s|olm.skipRange: .*|olm.skipRange: '>=$(DEFAULT_SKIP_RANGE_LOWER) <$(DEFAULT_VERSION)'|;" ${CSV}
 	$(MAKE) bundle-validate VERSION=$(DEFAULT_VERSION) IMAGE_TAG=v$(DEFAULT_VERSION) PREVIOUS_VERSION=$(DEFAULT_PREVIOUS_VERSION) SKIP_RANGE_LOWER=$(DEFAULT_SKIP_RANGE_LOWER)
 
@@ -460,7 +468,7 @@ add_channel_entry_for_the_bundle: verify-previous-version verify-skip-range
 		echo "entries:" >> ${CATALOG_INDEX}; \
 		echo "  - name: ${PACKAGE_NAME}.v${VERSION}" >> ${CATALOG_INDEX}; \
 		\
-		if [ -n "${PREVIOUS_VERSION}" ] && [ "${VERSION}" != "${DEFAULT_VERSION}" ] && [ "${PREVIOUS_VERSION}" != "${DEFAULT_VERSION}" ]; then \
+		if [ "${NO_REPLACES}" != "true" ] && [ -n "${PREVIOUS_VERSION}" ]; then \
 			echo "    replaces: ${PACKAGE_NAME}.v${PREVIOUS_VERSION}" >> ${CATALOG_INDEX}; \
 		fi; \
 		if [ -n "${SKIP_RANGE_LOWER}" ]; then \

@@ -316,5 +316,4 @@ spec:
   provider:
     name: Medik8s
     url: https://github.com/medik8s
-  replaces: medik8s-machine-deletion-remediation.v0.7.1
   version: 5.8.0
